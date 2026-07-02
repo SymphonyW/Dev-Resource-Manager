@@ -1,0 +1,59 @@
+.app-shell {
+    min-height: 100vh;
+    background: #101418;
+    color: #e8edf2;
+}
+
+.workspace {
+    min-height: 100vh;
+    padding: 32px;
+}
+
+.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    border-bottom: 1px solid #2b333d;
+    padding-bottom: 24px;
+}
+
+.eyebrow {
+    margin: 0 0 8px;
+    color: #8ea0b3;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+h1 {
+    margin: 0;
+    font-size: 32px;
+    font-weight: 700;
+}
+
+.status {
+    flex: 0 0 auto;
+    border: 1px solid #305f47;
+    border-radius: 4px;
+    background: #14251d;
+    color: #7ee2a8;
+    padding: 6px 10px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+@media (max-width: 640px) {
+    .workspace {
+        padding: 20px;
+    }
+
+    .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    h1 {
+        font-size: 26px;
+    }
+}
