@@ -1,4 +1,5 @@
 import {useCallback, useEffect, useState} from 'react';
+import StatusMessage from '../components/StatusMessage';
 import {loadOperationLogs} from '../services/logs';
 import type {OperationLog} from '../types/logs';
 import type {PageDefinition} from '../types/navigation';
@@ -50,11 +51,13 @@ function LogsPage({page}: LogsPageProps) {
                 </button>
             </div>
 
-            {errorMessage && <p className="resource-error">{errorMessage}</p>}
-            {isLoading && logs.length === 0 && <p className="resource-loading">Loading operation logs...</p>}
+            {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}
+            {isLoading && logs.length === 0 && (
+                <StatusMessage variant="loading">Loading operation logs...</StatusMessage>
+            )}
 
             {!isLoading && !errorMessage && logs.length === 0 && (
-                <p className="process-empty">No operation logs found.</p>
+                <StatusMessage variant="empty">No operation logs found.</StatusMessage>
             )}
 
             {logs.length > 0 && (

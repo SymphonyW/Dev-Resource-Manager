@@ -1,4 +1,5 @@
 import type {PageDefinition} from '../types/navigation';
+import CleanupPage from './CleanupPage';
 import DashboardPage from './DashboardPage';
 import LogsPage from './LogsPage';
 import PortsPage from './PortsPage';
@@ -20,6 +21,10 @@ function PagePanel({page}: PagePanelProps) {
 
     if (page.id === 'ports') {
         return <PortsPage page={page}/>;
+    }
+
+    if (page.id === 'cleanup') {
+        return <CleanupPage page={page}/>;
     }
 
     if (page.id === 'logs') {

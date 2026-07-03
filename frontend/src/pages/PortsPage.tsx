@@ -1,4 +1,5 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
+import StatusMessage from '../components/StatusMessage';
 import {isCommonDevelopmentPort, killProcessByPort, loadPortList} from '../services/ports';
 import type {PageDefinition} from '../types/navigation';
 import type {PortInfo, PortProtocolFilter} from '../types/ports';
@@ -164,12 +165,14 @@ function PortsPage({page}: PortsPageProps) {
                 </label>
             </div>
 
-            {errorMessage && <p className="resource-error">{errorMessage}</p>}
-            {operationMessage && <p className="operation-message">{operationMessage}</p>}
-            {isLoading && ports.length === 0 && <p className="resource-loading">Loading port list...</p>}
+            {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}
+            {operationMessage && <StatusMessage variant="success">{operationMessage}</StatusMessage>}
+            {isLoading && ports.length === 0 && (
+                <StatusMessage variant="loading">Loading port list...</StatusMessage>
+            )}
 
             {!isLoading && !errorMessage && visiblePorts.length === 0 && (
-                <p className="process-empty">{emptyMessage}</p>
+                <StatusMessage variant="empty">{emptyMessage}</StatusMessage>
             )}
 
             {visiblePorts.length > 0 && (
@@ -204,7 +207,7 @@ function PortsPage({page}: PortsPageProps) {
                                         <td>
                                             <button
                                                 aria-label="End port occupancy"
-                                                className="terminate-button"
+                                                className="danger-button table-action-button"
                                                 type="button"
                                                 disabled={port.isProtected || isKilling}
                                                 onClick={() => openKillConfirmation(port)}

@@ -1,4 +1,5 @@
 import {FormEvent, useCallback, useEffect, useState} from 'react';
+import StatusMessage from '../components/StatusMessage';
 import {
     addCustomProtectedProcessName,
     deleteCustomProtectedProcessName,
@@ -124,9 +125,9 @@ function SettingsPage({page}: SettingsPageProps) {
                 </button>
             </form>
 
-            {errorMessage && <p className="resource-error">{errorMessage}</p>}
-            {operationMessage && <p className="operation-message">{operationMessage}</p>}
-            {isLoading && <p className="resource-loading">Loading protection settings...</p>}
+            {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}
+            {operationMessage && <StatusMessage variant="success">{operationMessage}</StatusMessage>}
+            {isLoading && <StatusMessage variant="loading">Loading protection settings...</StatusMessage>}
 
             {!isLoading && (
                 <div className="settings-grid">
@@ -151,7 +152,7 @@ function SettingsPage({page}: SettingsPageProps) {
                             <span className="settings-count">{settings.customProcessNames.length}</span>
                         </div>
                         {settings.customProcessNames.length === 0 ? (
-                            <p className="process-empty">No custom protected processes yet.</p>
+                            <StatusMessage variant="empty">No custom protected processes yet.</StatusMessage>
                         ) : (
                             <ul className="protection-list" aria-label="Custom protected process list">
                                 {settings.customProcessNames.map((name) => (
@@ -159,7 +160,7 @@ function SettingsPage({page}: SettingsPageProps) {
                                         <span className="mono">{name}</span>
                                         <button
                                             aria-label={`Delete ${name}`}
-                                            className="terminate-button"
+                                            className="danger-button table-action-button"
                                             type="button"
                                             onClick={() => void handleDeleteCustomProcess(name)}
                                             disabled={isSaving}
