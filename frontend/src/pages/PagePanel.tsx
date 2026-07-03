@@ -1,5 +1,6 @@
 import type {PageDefinition} from '../types/navigation';
 import DashboardPage from './DashboardPage';
+import ProcessesPage from './ProcessesPage';
 
 interface PagePanelProps {
     page: PageDefinition;
@@ -8,6 +9,10 @@ interface PagePanelProps {
 function PagePanel({page}: PagePanelProps) {
     if (page.id === 'dashboard') {
         return <DashboardPage page={page}/>;
+    }
+
+    if (page.id === 'processes') {
+        return <ProcessesPage page={page}/>;
     }
 
     return (
