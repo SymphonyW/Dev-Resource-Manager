@@ -9,13 +9,16 @@ import (
 	"sort"
 	"strings"
 
+	processscanner "dev-resource-manager/internal/process"
+
 	gopsnet "github.com/shirou/gopsutil/v3/net"
 	gopsprocess "github.com/shirou/gopsutil/v3/process"
 )
 
 type processInfo struct {
-	name string
-	path string
+	name        string
+	path        string
+	isProtected bool
 }
 
 // List scans Windows TCP and UDP port ownership and returns a best-effort snapshot.
@@ -80,6 +83,7 @@ func appendConnections(ports []Info, connections []gopsnet.ConnectionStat, proto
 		if process, ok := processes[connection.Pid]; ok {
 			info.ProcessName = process.name
 			info.ProcessPath = process.path
+			info.IsProtected = process.isProtected
 		}
 
 		key := fmt.Sprintf("%s:%d:%d:%s", info.Protocol, info.Port, info.PID, info.Status)
@@ -114,11 +118,13 @@ func buildProcessIndex(ctx context.Context, connectionGroups ...[]gopsnet.Connec
 		info := processInfo{}
 		if name, err := process.NameWithContext(ctx); err == nil {
 			info.name = strings.TrimSpace(name)
+			info.isProtected = processscanner.IsProtectedName(info.name)
 		}
 		if path, err := process.ExeWithContext(ctx); err == nil {
 			info.path = strings.TrimSpace(path)
 			if info.name == "" {
 				info.name = filepath.Base(path)
+				info.isProtected = processscanner.IsProtectedName(info.name)
 			}
 		}
 

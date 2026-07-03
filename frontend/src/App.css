@@ -181,6 +181,14 @@ h1 {
     color: #f39b9b;
 }
 
+.operation-message {
+    border-top: 1px solid #2b333d;
+    margin: 0 0 18px;
+    padding-top: 18px;
+    color: #91efb5;
+    font-size: 14px;
+}
+
 .resource-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(150px, 1fr));
@@ -389,8 +397,120 @@ h1 {
 }
 
 .terminate-button {
+    cursor: pointer;
+}
+
+.terminate-button:disabled {
     cursor: not-allowed;
     opacity: 0.55;
+}
+
+.danger-button {
+    border: 1px solid #6f3737;
+    border-radius: 6px;
+    background: #2a1818;
+    color: #f3a6a6;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    min-height: 38px;
+    padding: 8px 12px;
+}
+
+.danger-button:hover:not(:disabled) {
+    border-color: #9a4b4b;
+    background: #351d1d;
+}
+
+.danger-button:disabled {
+    cursor: wait;
+    opacity: 0.64;
+}
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(5, 8, 12, 0.72);
+    padding: 20px;
+}
+
+.confirmation-dialog {
+    width: min(520px, 100%);
+    border: 1px solid #2b333d;
+    border-radius: 6px;
+    background: #151b21;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.36);
+    padding: 20px;
+}
+
+.dialog-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.dialog-header h2 {
+    margin: 0;
+    color: #f5f8fb;
+    font-size: 19px;
+}
+
+.dialog-close-button {
+    border: 1px solid #2b333d;
+    border-radius: 6px;
+    background: #101418;
+    color: #aab7c4;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 9px;
+}
+
+.dialog-close-button:disabled {
+    cursor: wait;
+    opacity: 0.64;
+}
+
+.confirmation-details {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+}
+
+.confirmation-details div {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: 12px;
+    border-top: 1px solid #252c34;
+    padding-top: 10px;
+}
+
+.confirmation-details dt {
+    color: #8ea0b3;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.confirmation-details dd {
+    margin: 0;
+    color: #d6dee6;
+    overflow-wrap: anywhere;
+}
+
+.dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
 }
 
 .page-empty-state {
@@ -454,5 +574,9 @@ h1 {
 
     .sort-controls {
         flex-wrap: wrap;
+    }
+
+    .confirmation-details div {
+        grid-template-columns: 1fr;
     }
 }

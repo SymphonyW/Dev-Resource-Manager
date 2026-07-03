@@ -13,4 +13,5 @@ type Info struct {
 	PID         int32  `json:"pid"`
 	ProcessName string `json:"processName"`
 	ProcessPath string `json:"processPath"`
+	IsProtected bool   `json:"isProtected"`
 }

@@ -75,6 +75,22 @@ func TestGetPortListReturnsCurrentTCPListener(t *testing.T) {
 	}
 }
 
+func TestKillProcessByPIDReturnsFailureForInvalidPID(t *testing.T) {
+	app := NewApp()
+
+	result := app.KillProcessByPID(-1)
+
+	if result.Success {
+		t.Fatalf("expected invalid pid kill to fail")
+	}
+	if result.PID != -1 {
+		t.Fatalf("expected pid -1, got %d", result.PID)
+	}
+	if result.Message == "" {
+		t.Fatalf("expected failure message")
+	}
+}
+
 func listenOnLocalTCPPortForAppTest(t *testing.T) (net.Listener, int) {
 	t.Helper()
 

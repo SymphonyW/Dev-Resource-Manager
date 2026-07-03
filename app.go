@@ -123,3 +123,23 @@ func (a *App) GetPortList() ([]portscanner.Info, error) {
 
 	return ports, nil
 }
+
+// KillProcessByPID ends a non-protected process by PID and returns an operation result.
+func (a *App) KillProcessByPID(pid int) processscanner.OperationResult {
+	ctx := a.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	return processscanner.KillByPID(ctx, pid)
+}
+
+// KillProcessByPort resolves a port owner and ends the owning process if it is allowed.
+func (a *App) KillProcessByPort(port int, protocol string) processscanner.OperationResult {
+	ctx := a.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	return portscanner.KillProcessByPort(ctx, port, protocol)
+}

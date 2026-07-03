@@ -34,6 +34,7 @@ export namespace port {
 	    pid: number;
 	    processName: string;
 	    processPath: string;
+	    isProtected: boolean;
 
 	    static createFrom(source: any = {}) {
 	        return new Info(source);
@@ -47,6 +48,7 @@ export namespace port {
 	        this.pid = source["pid"];
 	        this.processName = source["processName"];
 	        this.processPath = source["processPath"];
+	        this.isProtected = source["isProtected"];
 	    }
 	}
 
@@ -78,6 +80,24 @@ export namespace process {
 	        this.cpuPercent = source["cpuPercent"];
 	        this.memoryBytes = source["memoryBytes"];
 	        this.isProtected = source["isProtected"];
+	    }
+	}
+	export class OperationResult {
+	    success: boolean;
+	    message: string;
+	    pid: number;
+	    processName: string;
+
+	    static createFrom(source: any = {}) {
+	        return new OperationResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.message = source["message"];
+	        this.pid = source["pid"];
+	        this.processName = source["processName"];
 	    }
 	}
 
