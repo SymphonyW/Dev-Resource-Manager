@@ -5,3 +5,7 @@
 export function AppName() {
   return window['go']['main']['App']['AppName']();
 }
+
+export function GetSystemResourceInfo() {
+  return window['go']['main']['App']['GetSystemResourceInfo']();
+}

@@ -1,10 +1,15 @@
 import type {PageDefinition} from '../types/navigation';
+import DashboardPage from './DashboardPage';
 
 interface PagePanelProps {
     page: PageDefinition;
 }
 
 function PagePanel({page}: PagePanelProps) {
+    if (page.id === 'dashboard') {
+        return <DashboardPage page={page}/>;
+    }
+
     return (
         <section className="page-panel" aria-labelledby={`${page.id}-title`}>
             <p className="eyebrow">Dev Resource Manager</p>
