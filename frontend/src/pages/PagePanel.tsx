@@ -1,5 +1,6 @@
 import type {PageDefinition} from '../types/navigation';
 import DashboardPage from './DashboardPage';
+import PortsPage from './PortsPage';
 import ProcessesPage from './ProcessesPage';
 
 interface PagePanelProps {
@@ -13,6 +14,10 @@ function PagePanel({page}: PagePanelProps) {
 
     if (page.id === 'processes') {
         return <ProcessesPage page={page}/>;
+    }
+
+    if (page.id === 'ports') {
+        return <PortsPage page={page}/>;
     }
 
     return (

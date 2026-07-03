@@ -4,9 +4,11 @@ import App from './App';
 
 const getSystemResourceInfoMock = vi.fn();
 const getProcessListMock = vi.fn();
+const getPortListMock = vi.fn();
 
 vi.mock('../wailsjs/go/main/App', () => ({
     AppName: () => new Promise(() => {}),
+    GetPortList: () => getPortListMock(),
     GetProcessList: () => getProcessListMock(),
     GetSystemResourceInfo: () => getSystemResourceInfoMock(),
 }));
@@ -44,6 +46,41 @@ const processRows = [
     },
 ];
 
+const portRows = [
+    {
+        port: 3000,
+        protocol: 'TCP',
+        status: 'LISTEN',
+        pid: 100,
+        processName: 'node.exe',
+        processPath: 'C:\\Program Files\\nodejs\\node.exe',
+    },
+    {
+        port: 5432,
+        protocol: 'TCP',
+        status: 'LISTEN',
+        pid: 200,
+        processName: 'postgres.exe',
+        processPath: 'C:\\PostgreSQL\\bin\\postgres.exe',
+    },
+    {
+        port: 5353,
+        protocol: 'UDP',
+        status: 'LISTEN',
+        pid: 300,
+        processName: 'dns-sd.exe',
+        processPath: '',
+    },
+    {
+        port: 9000,
+        protocol: 'TCP',
+        status: 'ESTABLISHED',
+        pid: 400,
+        processName: 'custom-api.exe',
+        processPath: 'C:\\dev\\custom-api.exe',
+    },
+];
+
 describe('App layout navigation', () => {
     beforeEach(() => {
         getSystemResourceInfoMock.mockReset();
@@ -57,6 +94,8 @@ describe('App layout navigation', () => {
         });
         getProcessListMock.mockReset();
         getProcessListMock.mockResolvedValue(processRows);
+        getPortListMock.mockReset();
+        getPortListMock.mockResolvedValue(portRows);
     });
 
     it('renders all primary navigation pages and highlights Dashboard by default', async () => {
@@ -79,6 +118,7 @@ describe('App layout navigation', () => {
         expect(screen.getByRole('button', {name: 'Ports'})).toHaveAttribute('aria-current', 'page');
         expect(screen.getByRole('heading', {name: 'Ports'})).toBeInTheDocument();
         expect(screen.getByText('Review local TCP and UDP port usage and the owning process.')).toBeInTheDocument();
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
     });
 
     it('loads Dashboard resource metrics and refreshes them on demand', async () => {
@@ -176,5 +216,75 @@ describe('App layout navigation', () => {
 
         fireEvent.click(screen.getByRole('button', {name: 'Refresh Processes'}));
         expect(await screen.findByText('Unable to load process list.')).toBeInTheDocument();
+    });
+
+    it('loads Ports into a table with common dev port markers and disabled actions', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
+
+        expect(await screen.findByRole('heading', {name: 'Ports'})).toBeInTheDocument();
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+        expect(screen.getByText('3000')).toBeInTheDocument();
+        expect(screen.getByText('5432')).toBeInTheDocument();
+        expect(screen.getAllByText('Dev port')).toHaveLength(2);
+        expect(screen.getAllByRole('button', {name: 'Terminate process'})).toHaveLength(4);
+        expect(screen.getAllByRole('button', {name: 'Terminate process'}).every((button) => button.hasAttribute('disabled'))).toBe(true);
+    });
+
+    it('filters Ports by port number and process name', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Search by port number'), {target: {value: '5432'}});
+        expect(screen.getByText('postgres.exe')).toBeInTheDocument();
+        expect(screen.queryByText('node.exe')).not.toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Search by port number'), {target: {value: ''}});
+        fireEvent.change(screen.getByLabelText('Search by process name'), {target: {value: 'custom'}});
+        expect(screen.getByText('custom-api.exe')).toBeInTheDocument();
+        expect(screen.queryByText('postgres.exe')).not.toBeInTheDocument();
+    });
+
+    it('filters Ports by protocol and status', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
+        expect(await screen.findByText('dns-sd.exe')).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Filter by protocol'), {target: {value: 'UDP'}});
+        expect(screen.getByText('dns-sd.exe')).toBeInTheDocument();
+        expect(screen.queryByText('node.exe')).not.toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Filter by protocol'), {target: {value: 'all'}});
+        fireEvent.change(screen.getByLabelText('Filter by status'), {target: {value: 'ESTABLISHED'}});
+        expect(screen.getByText('custom-api.exe')).toBeInTheDocument();
+        expect(screen.queryByText('postgres.exe')).not.toBeInTheDocument();
+    });
+
+    it('refreshes Ports and handles loading empty and error states', async () => {
+        let resolveInitialPorts: (value: typeof portRows) => void = () => {};
+        getPortListMock
+            .mockReturnValueOnce(new Promise<typeof portRows>((resolve) => {
+                resolveInitialPorts = resolve;
+            }))
+            .mockResolvedValueOnce([])
+            .mockRejectedValueOnce(new Error('scan failed'));
+
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
+        expect(await screen.findByText('Loading port list...')).toBeInTheDocument();
+
+        resolveInitialPorts(portRows);
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', {name: 'Refresh Ports'}));
+        expect(await screen.findByText('No ports found.')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', {name: 'Refresh Ports'}));
+        expect(await screen.findByText('Unable to load port list.')).toBeInTheDocument();
     });
 });
