@@ -1,3 +1,48 @@
+export namespace config {
+	
+	export class OperationLog {
+	    id: number;
+	    action: string;
+	    pid: number;
+	    processName: string;
+	    port: number;
+	    result: string;
+	    message: string;
+	    createdAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new OperationLog(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.action = source["action"];
+	        this.pid = source["pid"];
+	        this.processName = source["processName"];
+	        this.port = source["port"];
+	        this.result = source["result"];
+	        this.message = source["message"];
+	        this.createdAt = source["createdAt"];
+	    }
+	}
+	export class ProtectionSettings {
+	    defaultProcessNames: string[];
+	    customProcessNames: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ProtectionSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.defaultProcessNames = source["defaultProcessNames"];
+	        this.customProcessNames = source["customProcessNames"];
+	    }
+	}
+
+}
+
 export namespace main {
 	
 	export class SystemResourceInfo {
@@ -26,7 +71,7 @@ export namespace main {
 }
 
 export namespace port {
-
+	
 	export class Info {
 	    port: number;
 	    protocol: string;
@@ -34,11 +79,12 @@ export namespace port {
 	    pid: number;
 	    processName: string;
 	    processPath: string;
-
+	    isProtected: boolean;
+	
 	    static createFrom(source: any = {}) {
 	        return new Info(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.port = source["port"];
@@ -47,6 +93,7 @@ export namespace port {
 	        this.pid = source["pid"];
 	        this.processName = source["processName"];
 	        this.processPath = source["processPath"];
+	        this.isProtected = source["isProtected"];
 	    }
 	}
 
@@ -80,5 +127,24 @@ export namespace process {
 	        this.isProtected = source["isProtected"];
 	    }
 	}
+	export class OperationResult {
+	    success: boolean;
+	    message: string;
+	    pid: number;
+	    processName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new OperationResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.message = source["message"];
+	        this.pid = source["pid"];
+	        this.processName = source["processName"];
+	    }
+	}
 
 }
+

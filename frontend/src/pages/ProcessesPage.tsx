@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
-import {formatMemorySize, formatPercent} from '../services/systemResources';
-import {loadProcessList} from '../services/processes';
+import StatusMessage from '../components/StatusMessage';
+import {formatMemorySize, formatPercent, isHighMemoryUsage} from '../services/systemResources';
+import {killProcessByPID, loadProcessList} from '../services/processes';
 import type {PageDefinition} from '../types/navigation';
 import type {ProcessInfo, ProcessSortKey} from '../types/processes';
 
@@ -14,7 +15,10 @@ function ProcessesPage({page}: ProcessesPageProps) {
     const [pidSearch, setPidSearch] = useState('');
     const [sortKey, setSortKey] = useState<ProcessSortKey>('memory');
     const [isLoading, setIsLoading] = useState(false);
+    const [isKilling, setIsKilling] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    const [operationMessage, setOperationMessage] = useState('');
+    const [processToKill, setProcessToKill] = useState<ProcessInfo | null>(null);
 
     const loadProcesses = useCallback(async () => {
         setIsLoading(true);
@@ -34,6 +38,40 @@ function ProcessesPage({page}: ProcessesPageProps) {
     useEffect(() => {
         void loadProcesses();
     }, [loadProcesses]);
+
+    const openKillConfirmation = (process: ProcessInfo) => {
+        setOperationMessage('');
+        setProcessToKill(process);
+    };
+
+    const closeKillConfirmation = () => {
+        if (!isKilling) {
+            setProcessToKill(null);
+        }
+    };
+
+    const confirmKillProcess = async () => {
+        if (!processToKill) {
+            return;
+        }
+
+        setIsKilling(true);
+        setErrorMessage('');
+
+        try {
+            const result = await killProcessByPID(processToKill.pid);
+            setOperationMessage(result.message);
+            setProcessToKill(null);
+
+            if (result.success) {
+                await loadProcesses();
+            }
+        } catch {
+            setOperationMessage('Unable to end process.');
+        } finally {
+            setIsKilling(false);
+        }
+    };
 
     const visibleProcesses = useMemo(() => {
         const normalizedNameSearch = nameSearch.trim().toLowerCase();
@@ -119,16 +157,19 @@ function ProcessesPage({page}: ProcessesPageProps) {
                 </div>
             </div>
 
-            {errorMessage && <p className="resource-error">{errorMessage}</p>}
-            {isLoading && processes.length === 0 && <p className="resource-loading">Loading process list...</p>}
+            {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}
+            {operationMessage && <StatusMessage variant="success">{operationMessage}</StatusMessage>}
+            {isLoading && processes.length === 0 && (
+                <StatusMessage variant="loading">Loading process list...</StatusMessage>
+            )}
 
             {!isLoading && !errorMessage && visibleProcesses.length === 0 && (
-                <p className="process-empty">{emptyMessage}</p>
+                <StatusMessage variant="empty">{emptyMessage}</StatusMessage>
             )}
 
             {visibleProcesses.length > 0 && (
                 <div className="process-table-wrap">
-                    <table className="process-table" aria-label="Process list">
+                    <table className="process-table process-list-table" aria-label="Process list">
                         <thead>
                             <tr>
                                 <th>PID</th>
@@ -144,13 +185,16 @@ function ProcessesPage({page}: ProcessesPageProps) {
                         </thead>
                         <tbody>
                             {visibleProcesses.map((process) => (
-                                <tr key={process.pid} className={process.isProtected ? 'protected-row' : undefined}>
+                                <tr key={process.pid} className={processRowClassName(process)}>
                                     <td className="mono">{process.pid}</td>
                                     <td data-testid="process-name">{process.name || 'Unknown'}</td>
                                     <td className="muted-cell">{process.path || 'Unavailable'}</td>
                                     <td className="muted-cell">{process.commandLine || 'Unavailable'}</td>
                                     <td className="mono">{formatPercent(process.cpuPercent)}</td>
-                                    <td className="mono">{formatMemorySize(process.memoryBytes)}</td>
+                                    <td className="mono">
+                                        {formatMemorySize(process.memoryBytes)}
+                                        {isHighMemoryUsage(process.memoryBytes) && <span className="memory-badge">High</span>}
+                                    </td>
                                     <td>{process.user || 'Unavailable'}</td>
                                     <td>
                                         <span className={process.isProtected ? 'protected-badge' : 'standard-badge'}>
@@ -158,8 +202,13 @@ function ProcessesPage({page}: ProcessesPageProps) {
                                         </span>
                                     </td>
                                     <td>
-                                        <button className="terminate-button" type="button" disabled>
-                                            Terminate
+                                        <button
+                                            className="danger-button table-action-button"
+                                            type="button"
+                                            disabled={process.isProtected || isKilling}
+                                            onClick={() => openKillConfirmation(process)}
+                                        >
+                                            结束进程
                                         </button>
                                     </td>
                                 </tr>
@@ -168,8 +217,79 @@ function ProcessesPage({page}: ProcessesPageProps) {
                     </table>
                 </div>
             )}
+
+            {processToKill && (
+                <div className="modal-backdrop" role="presentation">
+                    <section
+                        aria-labelledby="kill-process-dialog-title"
+                        className="confirmation-dialog"
+                        role="dialog"
+                    >
+                        <div className="dialog-header">
+                            <h2 id="kill-process-dialog-title">Confirm process termination</h2>
+                            <button
+                                aria-label="Close"
+                                className="dialog-close-button"
+                                type="button"
+                                onClick={closeKillConfirmation}
+                                disabled={isKilling}
+                            >
+                                Close
+                            </button>
+                        </div>
+                        <dl className="confirmation-details">
+                            <div>
+                                <dt>PID</dt>
+                                <dd className="mono">{processToKill.pid}</dd>
+                            </div>
+                            <div>
+                                <dt>Process Name</dt>
+                                <dd>{processToKill.name || 'Unknown'}</dd>
+                            </div>
+                            <div>
+                                <dt>Path</dt>
+                                <dd>{processToKill.path || 'Unavailable'}</dd>
+                            </div>
+                            <div>
+                                <dt>Memory</dt>
+                                <dd className="mono">{formatMemorySize(processToKill.memoryBytes)}</dd>
+                            </div>
+                        </dl>
+                        <div className="dialog-actions">
+                            <button
+                                className="sort-button"
+                                type="button"
+                                onClick={closeKillConfirmation}
+                                disabled={isKilling}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="danger-button"
+                                type="button"
+                                onClick={confirmKillProcess}
+                                disabled={isKilling}
+                            >
+                                Confirm End Process
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            )}
         </section>
     );
+}
+
+function processRowClassName(process: ProcessInfo): string | undefined {
+    const classNames = [];
+    if (process.isProtected) {
+        classNames.push('protected-row');
+    }
+    if (isHighMemoryUsage(process.memoryBytes)) {
+        classNames.push('high-memory-row');
+    }
+
+    return classNames.length > 0 ? classNames.join(' ') : undefined;
 }
 
 export default ProcessesPage;

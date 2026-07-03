@@ -1,35 +1,22 @@
 package process
 
 import (
-	"path/filepath"
-	"strings"
+	"context"
+
+	"dev-resource-manager/internal/config"
 )
 
-var defaultProtectedNames = map[string]struct{}{
-	"system":                    {},
-	"registry":                  {},
-	"smss.exe":                  {},
-	"csrss.exe":                 {},
-	"wininit.exe":               {},
-	"winlogon.exe":              {},
-	"services.exe":              {},
-	"lsass.exe":                 {},
-	"svchost.exe":               {},
-	"explorer.exe":              {},
-	"dwm.exe":                   {},
-	"taskhostw.exe":             {},
-	"runtimebroker.exe":         {},
-	"securityhealthservice.exe": {},
-	"msmpeng.exe":               {},
+// Protector checks whether a process name should be protected from termination.
+type Protector interface {
+	IsProtectedName(name string) bool
 }
 
-// IsProtectedName reports whether a process name is protected from termination by default.
+// IsProtectedName reports whether a process name is protected by current default or custom rules.
 func IsProtectedName(name string) bool {
-	normalized := strings.ToLower(strings.TrimSpace(filepath.Base(name)))
-	if normalized == "." || normalized == "" {
-		return false
+	rules, err := config.LoadDefaultProtectionRules(context.Background())
+	if err != nil {
+		return config.IsDefaultProtectedProcessName(name)
 	}
 
-	_, ok := defaultProtectedNames[normalized]
-	return ok
+	return rules.IsProtectedName(name)
 }

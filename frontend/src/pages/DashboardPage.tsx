@@ -1,4 +1,5 @@
 import {useCallback, useEffect, useState} from 'react';
+import StatusMessage from '../components/StatusMessage';
 import {formatMemorySize, formatPercent, loadSystemResourceInfo} from '../services/systemResources';
 import type {PageDefinition} from '../types/navigation';
 import type {SystemResourceInfo} from '../types/systemResources';
@@ -54,8 +55,10 @@ function DashboardPage({page}: DashboardPageProps) {
                 </button>
             </div>
 
-            {errorMessage && <p className="resource-error">{errorMessage}</p>}
-            {isLoading && !resourceInfo && <p className="resource-loading">Loading resource snapshot...</p>}
+            {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}
+            {isLoading && !resourceInfo && (
+                <StatusMessage variant="loading">Loading resource snapshot...</StatusMessage>
+            )}
 
             {resourceInfo && (
                 <dl className="resource-grid" aria-label="System resource metrics">
