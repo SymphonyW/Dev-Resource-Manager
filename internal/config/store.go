@@ -16,6 +16,22 @@ CREATE TABLE IF NOT EXISTS custom_protected_processes (
 	created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );`
 
+const createOperationLogsTableSQL = `
+CREATE TABLE IF NOT EXISTS operation_logs (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	action TEXT NOT NULL,
+	pid INTEGER NOT NULL DEFAULT 0,
+	process_name TEXT NOT NULL DEFAULT '',
+	port INTEGER NOT NULL DEFAULT 0,
+	result TEXT NOT NULL,
+	message TEXT NOT NULL,
+	created_at TEXT NOT NULL
+);`
+
+const createOperationLogsCreatedAtIndexSQL = `
+CREATE INDEX IF NOT EXISTS idx_operation_logs_created_at
+ON operation_logs (created_at DESC, id DESC);`
+
 // Store persists user-managed configuration.
 type Store struct {
 	db *sql.DB
@@ -173,6 +189,12 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if _, err := s.db.ExecContext(ctx, createCustomProtectedProcessesTableSQL); err != nil {
 		return fmt.Errorf("initialize configuration database: %w", err)
+	}
+	if _, err := s.db.ExecContext(ctx, createOperationLogsTableSQL); err != nil {
+		return fmt.Errorf("initialize operation logs table: %w", err)
+	}
+	if _, err := s.db.ExecContext(ctx, createOperationLogsCreatedAtIndexSQL); err != nil {
+		return fmt.Errorf("initialize operation logs index: %w", err)
 	}
 
 	return nil

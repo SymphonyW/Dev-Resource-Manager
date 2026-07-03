@@ -10,11 +10,13 @@ const killProcessByPortMock = vi.fn();
 const getProtectionSettingsMock = vi.fn();
 const addCustomProtectedProcessNameMock = vi.fn();
 const deleteCustomProtectedProcessNameMock = vi.fn();
+const getOperationLogsMock = vi.fn();
 
 vi.mock('../wailsjs/go/main/App', () => ({
     AddCustomProtectedProcessName: (name: string) => addCustomProtectedProcessNameMock(name),
     AppName: () => new Promise(() => {}),
     DeleteCustomProtectedProcessName: (name: string) => deleteCustomProtectedProcessNameMock(name),
+    GetOperationLogs: () => getOperationLogsMock(),
     GetPortList: () => getPortListMock(),
     GetProcessList: () => getProcessListMock(),
     GetProtectionSettings: () => getProtectionSettingsMock(),
@@ -109,6 +111,29 @@ const protectionSettings = {
     customProcessNames: ['redis-server.exe'],
 };
 
+const operationLogs = [
+    {
+        id: 2,
+        action: 'kill_process_by_port',
+        pid: 100,
+        processName: 'node.exe',
+        port: 3000,
+        result: 'success',
+        message: 'Process node.exe (PID 100) ended for TCP port 3000.',
+        createdAt: '2026-07-03T09:05:00Z',
+    },
+    {
+        id: 1,
+        action: 'kill_process_by_pid',
+        pid: -1,
+        processName: '',
+        port: 0,
+        result: 'failure',
+        message: 'PID -1 is invalid.',
+        createdAt: '2026-07-03T09:00:00Z',
+    },
+];
+
 describe('App layout navigation', () => {
     beforeEach(() => {
         getSystemResourceInfoMock.mockReset();
@@ -150,6 +175,8 @@ describe('App layout navigation', () => {
             defaultProcessNames: protectionSettings.defaultProcessNames,
             customProcessNames: [],
         });
+        getOperationLogsMock.mockReset();
+        getOperationLogsMock.mockResolvedValue(operationLogs);
     });
 
     it('renders all primary navigation pages and highlights Dashboard by default', async () => {
@@ -454,5 +481,27 @@ describe('App layout navigation', () => {
         await waitFor(() => expect(deleteCustomProtectedProcessNameMock).toHaveBeenCalledWith('redis-server.exe'));
         expect(await screen.findByText('No custom protected processes yet.')).toBeInTheDocument();
         expect(screen.getByText('Custom protected process removed.')).toBeInTheDocument();
+    });
+
+    it('loads Logs in newest-first order and refreshes them', async () => {
+        getOperationLogsMock
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce(operationLogs);
+
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Logs'}));
+
+        expect(await screen.findByRole('heading', {name: 'Logs'})).toBeInTheDocument();
+        expect(await screen.findByText('No operation logs found.')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', {name: 'Refresh Logs'}));
+
+        expect(await screen.findByText('kill_process_by_port')).toBeInTheDocument();
+        expect(screen.getByText('kill_process_by_pid')).toBeInTheDocument();
+        expect(screen.getByText('Process node.exe (PID 100) ended for TCP port 3000.')).toBeInTheDocument();
+        expect(screen.getByText('PID -1 is invalid.')).toBeInTheDocument();
+        expect(screen.getAllByTestId('operation-log-action')[0]).toHaveTextContent('kill_process_by_port');
+        await waitFor(() => expect(getOperationLogsMock).toHaveBeenCalledTimes(2));
     });
 });
