@@ -89,6 +89,41 @@ func TestKillProcessByPIDReturnsFailureForInvalidPID(t *testing.T) {
 	if result.Message == "" {
 		t.Fatalf("expected failure message")
 	}
+
+	logs, err := app.GetOperationLogs()
+	if err != nil {
+		t.Fatalf("get operation logs: %v", err)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("expected one operation log, got %d", len(logs))
+	}
+	if logs[0].Action != "kill_process_by_pid" || logs[0].PID != -1 || logs[0].Result != "failure" {
+		t.Fatalf("unexpected operation log: %+v", logs[0])
+	}
+	if logs[0].Message == "" {
+		t.Fatalf("expected operation log message")
+	}
+}
+
+func TestKillProcessByPortLogsFailureForUnsupportedProtocol(t *testing.T) {
+	app := newTestApp(t)
+
+	result := app.KillProcessByPort(3000, "ICMP")
+
+	if result.Success {
+		t.Fatalf("expected unsupported protocol kill to fail")
+	}
+
+	logs, err := app.GetOperationLogs()
+	if err != nil {
+		t.Fatalf("get operation logs: %v", err)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("expected one operation log, got %d", len(logs))
+	}
+	if logs[0].Action != "kill_process_by_port" || logs[0].Port != 3000 || logs[0].Result != "failure" {
+		t.Fatalf("unexpected operation log: %+v", logs[0])
+	}
 }
 
 func TestProtectionSettingsManageCustomProtectedProcesses(t *testing.T) {

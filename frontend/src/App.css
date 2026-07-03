@@ -374,7 +374,8 @@ h1 {
 .protected-badge,
 .standard-badge,
 .dev-port-badge,
-.protocol-badge {
+.protocol-badge,
+.result-badge {
     display: inline-flex;
     align-items: center;
     border-radius: 999px;
@@ -406,6 +407,18 @@ h1 {
     border: 1px solid #314457;
     background: #172331;
     color: #9fcef8;
+}
+
+.result-badge.success {
+    border: 1px solid #305f47;
+    background: #203125;
+    color: #91efb5;
+}
+
+.result-badge.failure {
+    border: 1px solid #6f3737;
+    background: #2a1818;
+    color: #f3a6a6;
 }
 
 .terminate-button {

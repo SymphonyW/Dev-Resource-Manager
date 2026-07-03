@@ -1,5 +1,31 @@
 export namespace config {
 
+	export class OperationLog {
+	    id: number;
+	    action: string;
+	    pid: number;
+	    processName: string;
+	    port: number;
+	    result: string;
+	    message: string;
+	    createdAt: string;
+
+	    static createFrom(source: any = {}) {
+	        return new OperationLog(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.action = source["action"];
+	        this.pid = source["pid"];
+	        this.processName = source["processName"];
+	        this.port = source["port"];
+	        this.result = source["result"];
+	        this.message = source["message"];
+	        this.createdAt = source["createdAt"];
+	    }
+	}
 	export class ProtectionSettings {
 	    defaultProcessNames: string[];
 	    customProcessNames: string[];

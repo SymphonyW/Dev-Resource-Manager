@@ -96,6 +96,48 @@ func TestProtectionStoreRejectsEmptyAndDuplicateCustomNames(t *testing.T) {
 	}
 }
 
+func TestOperationLogsAreStoredNewestFirst(t *testing.T) {
+	ctx := context.Background()
+	store := newTestStore(t)
+
+	if err := store.AddOperationLog(ctx, OperationLogInput{
+		Action:      "kill_process_by_pid",
+		PID:         101,
+		ProcessName: "node.exe",
+		Result:      "success",
+		Message:     "Process node.exe (PID 101) ended.",
+	}); err != nil {
+		t.Fatalf("add first operation log: %v", err)
+	}
+	if err := store.AddOperationLog(ctx, OperationLogInput{
+		Action:      "kill_process_by_port",
+		PID:         202,
+		ProcessName: "postgres.exe",
+		Port:        5432,
+		Result:      "failure",
+		Message:     "Permission denied.",
+	}); err != nil {
+		t.Fatalf("add second operation log: %v", err)
+	}
+
+	logs, err := store.GetOperationLogs(ctx)
+	if err != nil {
+		t.Fatalf("get operation logs: %v", err)
+	}
+	if len(logs) != 2 {
+		t.Fatalf("expected 2 operation logs, got %d", len(logs))
+	}
+	if logs[0].Action != "kill_process_by_port" {
+		t.Fatalf("expected newest log first, got %+v", logs)
+	}
+	if logs[0].PID != 202 || logs[0].Port != 5432 || logs[0].Result != "failure" {
+		t.Fatalf("unexpected newest log contents: %+v", logs[0])
+	}
+	if logs[0].CreatedAt == "" {
+		t.Fatalf("expected createdAt to be set")
+	}
+}
+
 func newTestStore(t *testing.T) *Store {
 	t.Helper()
 

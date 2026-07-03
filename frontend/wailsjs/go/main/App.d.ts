@@ -11,6 +11,8 @@ export function AppName():Promise<string>;
 
 export function DeleteCustomProtectedProcessName(arg1:string):Promise<config.ProtectionSettings>;
 
+export function GetOperationLogs():Promise<Array<config.OperationLog>>;
+
 export function GetPortList():Promise<Array<port.Info>>;
 
 export function GetProcessList():Promise<Array<process.Info>>;

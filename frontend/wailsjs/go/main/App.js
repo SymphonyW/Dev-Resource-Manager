@@ -14,6 +14,10 @@ export function DeleteCustomProtectedProcessName(arg1) {
   return window['go']['main']['App']['DeleteCustomProtectedProcessName'](arg1);
 }
 
+export function GetOperationLogs() {
+  return window['go']['main']['App']['GetOperationLogs']();
+}
+
 export function GetPortList() {
   return window['go']['main']['App']['GetPortList']();
 }
