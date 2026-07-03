@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
-import {formatMemorySize, formatPercent} from '../services/systemResources';
+import StatusMessage from '../components/StatusMessage';
+import {formatMemorySize, formatPercent, isHighMemoryUsage} from '../services/systemResources';
 import {killProcessByPID, loadProcessList} from '../services/processes';
 import type {PageDefinition} from '../types/navigation';
 import type {ProcessInfo, ProcessSortKey} from '../types/processes';
@@ -156,17 +157,19 @@ function ProcessesPage({page}: ProcessesPageProps) {
                 </div>
             </div>
 
-            {errorMessage && <p className="resource-error">{errorMessage}</p>}
-            {operationMessage && <p className="operation-message">{operationMessage}</p>}
-            {isLoading && processes.length === 0 && <p className="resource-loading">Loading process list...</p>}
+            {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}
+            {operationMessage && <StatusMessage variant="success">{operationMessage}</StatusMessage>}
+            {isLoading && processes.length === 0 && (
+                <StatusMessage variant="loading">Loading process list...</StatusMessage>
+            )}
 
             {!isLoading && !errorMessage && visibleProcesses.length === 0 && (
-                <p className="process-empty">{emptyMessage}</p>
+                <StatusMessage variant="empty">{emptyMessage}</StatusMessage>
             )}
 
             {visibleProcesses.length > 0 && (
                 <div className="process-table-wrap">
-                    <table className="process-table" aria-label="Process list">
+                    <table className="process-table process-list-table" aria-label="Process list">
                         <thead>
                             <tr>
                                 <th>PID</th>
@@ -182,13 +185,16 @@ function ProcessesPage({page}: ProcessesPageProps) {
                         </thead>
                         <tbody>
                             {visibleProcesses.map((process) => (
-                                <tr key={process.pid} className={process.isProtected ? 'protected-row' : undefined}>
+                                <tr key={process.pid} className={processRowClassName(process)}>
                                     <td className="mono">{process.pid}</td>
                                     <td data-testid="process-name">{process.name || 'Unknown'}</td>
                                     <td className="muted-cell">{process.path || 'Unavailable'}</td>
                                     <td className="muted-cell">{process.commandLine || 'Unavailable'}</td>
                                     <td className="mono">{formatPercent(process.cpuPercent)}</td>
-                                    <td className="mono">{formatMemorySize(process.memoryBytes)}</td>
+                                    <td className="mono">
+                                        {formatMemorySize(process.memoryBytes)}
+                                        {isHighMemoryUsage(process.memoryBytes) && <span className="memory-badge">High</span>}
+                                    </td>
                                     <td>{process.user || 'Unavailable'}</td>
                                     <td>
                                         <span className={process.isProtected ? 'protected-badge' : 'standard-badge'}>
@@ -197,7 +203,7 @@ function ProcessesPage({page}: ProcessesPageProps) {
                                     </td>
                                     <td>
                                         <button
-                                            className="terminate-button"
+                                            className="danger-button table-action-button"
                                             type="button"
                                             disabled={process.isProtected || isKilling}
                                             onClick={() => openKillConfirmation(process)}
@@ -272,6 +278,18 @@ function ProcessesPage({page}: ProcessesPageProps) {
             )}
         </section>
     );
+}
+
+function processRowClassName(process: ProcessInfo): string | undefined {
+    const classNames = [];
+    if (process.isProtected) {
+        classNames.push('protected-row');
+    }
+    if (isHighMemoryUsage(process.memoryBytes)) {
+        classNames.push('high-memory-row');
+    }
+
+    return classNames.length > 0 ? classNames.join(' ') : undefined;
 }
 
 export default ProcessesPage;

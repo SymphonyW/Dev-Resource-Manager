@@ -1,8 +1,9 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
+import StatusMessage from '../components/StatusMessage';
 import {buildCleanupCandidates} from '../services/cleanup';
-import {loadPortList} from '../services/ports';
+import {isCommonDevelopmentPort, loadPortList} from '../services/ports';
 import {killProcessByPID, loadProcessList} from '../services/processes';
-import {formatMemorySize, formatPercent} from '../services/systemResources';
+import {formatMemorySize, formatPercent, isHighMemoryUsage} from '../services/systemResources';
 import type {CleanupCandidate} from '../types/cleanup';
 import type {PageDefinition} from '../types/navigation';
 import type {PortInfo} from '../types/ports';
@@ -167,12 +168,14 @@ function CleanupPage({page}: CleanupPageProps) {
                 </div>
             </div>
 
-            {errorMessage && <p className="resource-error">{errorMessage}</p>}
-            {operationMessage && <p className="operation-message">{operationMessage}</p>}
-            {isLoading && candidates.length === 0 && <p className="resource-loading">Loading cleanup candidates...</p>}
+            {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}
+            {operationMessage && <StatusMessage variant="success">{operationMessage}</StatusMessage>}
+            {isLoading && candidates.length === 0 && (
+                <StatusMessage variant="loading">Loading cleanup candidates...</StatusMessage>
+            )}
 
             {!isLoading && !errorMessage && candidates.length === 0 && (
-                <p className="process-empty">No development-related processes found.</p>
+                <StatusMessage variant="empty">No development-related processes found.</StatusMessage>
             )}
 
             {candidates.length > 0 && (
@@ -191,7 +194,7 @@ function CleanupPage({page}: CleanupPageProps) {
                         </thead>
                         <tbody>
                             {candidates.map((candidate) => (
-                                <tr key={candidate.pid} className={candidate.isProtected ? 'protected-row' : undefined}>
+                                <tr key={candidate.pid} className={cleanupRowClassName(candidate)}>
                                     <td>
                                         <input
                                             aria-label={`Select ${candidate.name || 'Unknown'} PID ${candidate.pid}`}
@@ -203,9 +206,12 @@ function CleanupPage({page}: CleanupPageProps) {
                                     </td>
                                     <td className="mono">{candidate.pid}</td>
                                     <td data-testid="cleanup-process-name">{candidate.name || 'Unknown'}</td>
-                                    <td className="mono">{formatMemorySize(candidate.memoryBytes)}</td>
+                                    <td className="mono">
+                                        {formatMemorySize(candidate.memoryBytes)}
+                                        {isHighMemoryUsage(candidate.memoryBytes) && <span className="memory-badge">High</span>}
+                                    </td>
                                     <td className="mono">{formatPercent(candidate.cpuPercent)}</td>
-                                    <td className="mono">{formatPorts(candidate.ports)}</td>
+                                    <td className="mono">{renderPorts(candidate.ports)}</td>
                                     <td>
                                         <span className={candidate.isProtected ? 'protected-badge' : 'standard-badge'}>
                                             {candidate.isProtected ? 'Protected' : 'Standard'}
@@ -280,6 +286,34 @@ function formatPorts(ports: number[]): string {
     }
 
     return ports.join(', ');
+}
+
+function renderPorts(ports: number[]) {
+    if (ports.length === 0) {
+        return 'None';
+    }
+
+    return ports.map((port, index) => (
+        <span key={port}>
+            {index > 0 && ', '}
+            <span className={isCommonDevelopmentPort(port) ? 'inline-dev-port' : undefined}>{port}</span>
+        </span>
+    ));
+}
+
+function cleanupRowClassName(candidate: CleanupCandidate): string | undefined {
+    const classNames = [];
+    if (candidate.isProtected) {
+        classNames.push('protected-row');
+    }
+    if (isHighMemoryUsage(candidate.memoryBytes)) {
+        classNames.push('high-memory-row');
+    }
+    if (candidate.ports.some(isCommonDevelopmentPort)) {
+        classNames.push('dev-port-row');
+    }
+
+    return classNames.length > 0 ? classNames.join(' ') : undefined;
 }
 
 export default CleanupPage;
