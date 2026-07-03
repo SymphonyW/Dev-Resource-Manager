@@ -21,3 +21,7 @@ export function GetSystemResourceInfo() {
 export function KillProcessByPID(arg1) {
   return window['go']['main']['App']['KillProcessByPID'](arg1);
 }
+
+export function KillProcessByPort(arg1, arg2) {
+  return window['go']['main']['App']['KillProcessByPort'](arg1, arg2);
+}

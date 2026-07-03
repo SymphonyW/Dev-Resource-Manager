@@ -34,6 +34,7 @@ export namespace port {
 	    pid: number;
 	    processName: string;
 	    processPath: string;
+	    isProtected: boolean;
 
 	    static createFrom(source: any = {}) {
 	        return new Info(source);
@@ -47,6 +48,7 @@ export namespace port {
 	        this.pid = source["pid"];
 	        this.processName = source["processName"];
 	        this.processPath = source["processPath"];
+	        this.isProtected = source["isProtected"];
 	    }
 	}
 

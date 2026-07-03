@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
-import {isCommonDevelopmentPort, loadPortList} from '../services/ports';
+import {isCommonDevelopmentPort, killProcessByPort, loadPortList} from '../services/ports';
 import type {PageDefinition} from '../types/navigation';
 import type {PortInfo, PortProtocolFilter} from '../types/ports';
 
@@ -14,7 +14,10 @@ function PortsPage({page}: PortsPageProps) {
     const [protocolFilter, setProtocolFilter] = useState<PortProtocolFilter>('all');
     const [statusFilter, setStatusFilter] = useState('all');
     const [isLoading, setIsLoading] = useState(false);
+    const [isKilling, setIsKilling] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    const [operationMessage, setOperationMessage] = useState('');
+    const [portToKill, setPortToKill] = useState<PortInfo | null>(null);
 
     const loadPorts = useCallback(async () => {
         setIsLoading(true);
@@ -34,6 +37,40 @@ function PortsPage({page}: PortsPageProps) {
     useEffect(() => {
         void loadPorts();
     }, [loadPorts]);
+
+    const openKillConfirmation = (port: PortInfo) => {
+        setOperationMessage('');
+        setPortToKill(port);
+    };
+
+    const closeKillConfirmation = () => {
+        if (!isKilling) {
+            setPortToKill(null);
+        }
+    };
+
+    const confirmKillPortOccupant = async () => {
+        if (!portToKill) {
+            return;
+        }
+
+        setIsKilling(true);
+        setErrorMessage('');
+
+        try {
+            const result = await killProcessByPort(portToKill.port, portToKill.protocol);
+            setOperationMessage(result.message);
+            setPortToKill(null);
+
+            if (result.success) {
+                await loadPorts();
+            }
+        } catch {
+            setOperationMessage('Unable to end process occupying this port.');
+        } finally {
+            setIsKilling(false);
+        }
+    };
 
     const statusOptions = useMemo(() => {
         return Array.from(new Set(ports.map((port) => port.status).filter(Boolean))).sort();
@@ -128,6 +165,7 @@ function PortsPage({page}: PortsPageProps) {
             </div>
 
             {errorMessage && <p className="resource-error">{errorMessage}</p>}
+            {operationMessage && <p className="operation-message">{operationMessage}</p>}
             {isLoading && ports.length === 0 && <p className="resource-loading">Loading port list...</p>}
 
             {!isLoading && !errorMessage && visiblePorts.length === 0 && (
@@ -165,12 +203,13 @@ function PortsPage({page}: PortsPageProps) {
                                         <td className="muted-cell">{port.processPath || 'Unavailable'}</td>
                                         <td>
                                             <button
-                                                aria-label="Terminate process"
+                                                aria-label="End port occupancy"
                                                 className="terminate-button"
                                                 type="button"
-                                                disabled
+                                                disabled={port.isProtected || isKilling}
+                                                onClick={() => openKillConfirmation(port)}
                                             >
-                                                Terminate
+                                                结束占用
                                             </button>
                                         </td>
                                     </tr>
@@ -178,6 +217,69 @@ function PortsPage({page}: PortsPageProps) {
                             })}
                         </tbody>
                     </table>
+                </div>
+            )}
+
+            {portToKill && (
+                <div className="modal-backdrop" role="presentation">
+                    <section
+                        aria-labelledby="kill-port-dialog-title"
+                        className="confirmation-dialog"
+                        role="dialog"
+                    >
+                        <div className="dialog-header">
+                            <h2 id="kill-port-dialog-title">Confirm port occupancy termination</h2>
+                            <button
+                                aria-label="Close"
+                                className="dialog-close-button"
+                                type="button"
+                                onClick={closeKillConfirmation}
+                                disabled={isKilling}
+                            >
+                                Close
+                            </button>
+                        </div>
+                        <dl className="confirmation-details">
+                            <div>
+                                <dt>Port</dt>
+                                <dd className="mono">{portToKill.port}</dd>
+                            </div>
+                            <div>
+                                <dt>Protocol</dt>
+                                <dd>{portToKill.protocol || 'Unknown'}</dd>
+                            </div>
+                            <div>
+                                <dt>PID</dt>
+                                <dd className="mono">{portToKill.pid}</dd>
+                            </div>
+                            <div>
+                                <dt>Process Name</dt>
+                                <dd>{portToKill.processName || 'Unknown'}</dd>
+                            </div>
+                            <div>
+                                <dt>Path</dt>
+                                <dd>{portToKill.processPath || 'Unavailable'}</dd>
+                            </div>
+                        </dl>
+                        <div className="dialog-actions">
+                            <button
+                                className="sort-button"
+                                type="button"
+                                onClick={closeKillConfirmation}
+                                disabled={isKilling}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="danger-button"
+                                type="button"
+                                onClick={confirmKillPortOccupant}
+                                disabled={isKilling}
+                            >
+                                Confirm End Occupancy
+                            </button>
+                        </div>
+                    </section>
                 </div>
             )}
         </section>
