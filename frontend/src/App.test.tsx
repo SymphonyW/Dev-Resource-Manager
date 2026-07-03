@@ -56,6 +56,26 @@ const processRows = [
         memoryBytes: 1024 * 1024 * 1024,
         isProtected: false,
     },
+    {
+        pid: 500,
+        name: 'vmmem',
+        path: '',
+        commandLine: '',
+        user: 'NT AUTHORITY\\SYSTEM',
+        cpuPercent: 0.5,
+        memoryBytes: 256 * 1024 * 1024,
+        isProtected: true,
+    },
+    {
+        pid: 600,
+        name: 'chrome.exe',
+        path: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        commandLine: 'chrome.exe',
+        user: 'DESKTOP\\dev',
+        cpuPercent: 1.1,
+        memoryBytes: 384 * 1024 * 1024,
+        isProtected: false,
+    },
 ];
 
 const portRows = [
@@ -437,6 +457,67 @@ describe('App layout navigation', () => {
 
         fireEvent.click(screen.getByRole('button', {name: 'Refresh Ports'}));
         expect(await screen.findByText('Unable to load port list.')).toBeInTheDocument();
+    });
+
+    it('loads Cleanup candidates with ports and keeps protected processes unselectable', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Cleanup'}));
+
+        expect(await screen.findByRole('heading', {name: 'Cleanup'})).toBeInTheDocument();
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+        expect(screen.getByText('postgres.exe')).toBeInTheDocument();
+        expect(screen.getByText('vmmem')).toBeInTheDocument();
+        expect(screen.queryByText('chrome.exe')).not.toBeInTheDocument();
+        expect(screen.getByText('3000')).toBeInTheDocument();
+        expect(screen.getByText('5432')).toBeInTheDocument();
+
+        expect(screen.getByRole('checkbox', {name: 'Select node.exe PID 100'})).not.toBeDisabled();
+        expect(screen.getByRole('checkbox', {name: 'Select vmmem PID 500'})).toBeDisabled();
+    });
+
+    it('confirms and ends selected Cleanup candidates through the logged PID operation', async () => {
+        getProcessListMock
+            .mockResolvedValueOnce(processRows)
+            .mockResolvedValueOnce(processRows.filter((process) => process.pid !== 100 && process.pid !== 200));
+        getPortListMock
+            .mockResolvedValueOnce(portRows)
+            .mockResolvedValueOnce(portRows.filter((port) => port.pid !== 100 && port.pid !== 200));
+        killProcessByPIDMock
+            .mockResolvedValueOnce({
+                success: true,
+                message: 'Process node.exe (PID 100) ended.',
+                pid: 100,
+                processName: 'node.exe',
+            })
+            .mockResolvedValueOnce({
+                success: true,
+                message: 'Process postgres.exe (PID 200) ended.',
+                pid: 200,
+                processName: 'postgres.exe',
+            });
+
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Cleanup'}));
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('checkbox', {name: 'Select node.exe PID 100'}));
+        fireEvent.click(screen.getByRole('checkbox', {name: 'Select postgres.exe PID 200'}));
+        fireEvent.click(screen.getByRole('button', {name: 'End selected processes'}));
+
+        const dialog = screen.getByRole('dialog', {name: 'Confirm cleanup termination'});
+        expect(within(dialog).getByText('2 selected processes')).toBeInTheDocument();
+        expect(within(dialog).getByText('node.exe')).toBeInTheDocument();
+        expect(within(dialog).getByText('postgres.exe')).toBeInTheDocument();
+
+        fireEvent.click(within(dialog).getByRole('button', {name: 'Confirm End Selected'}));
+
+        await waitFor(() => expect(killProcessByPIDMock).toHaveBeenCalledWith(100));
+        await waitFor(() => expect(killProcessByPIDMock).toHaveBeenCalledWith(200));
+        expect(await screen.findByText('2 cleanup operations finished. 2 succeeded, 0 failed.')).toBeInTheDocument();
+        await waitFor(() => expect(getProcessListMock).toHaveBeenCalledTimes(2));
+        await waitFor(() => expect(getPortListMock).toHaveBeenCalledTimes(2));
     });
 
     it('loads Settings protection lists and keeps default entries read-only', async () => {
