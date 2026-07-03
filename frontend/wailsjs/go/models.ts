@@ -1,5 +1,5 @@
 export namespace main {
-	
+
 	export class SystemResourceInfo {
 	    cpuPercent: number;
 	    totalMemoryBytes: number;
@@ -7,11 +7,11 @@ export namespace main {
 	    freeMemoryBytes: number;
 	    processCount: number;
 	    portCount: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new SystemResourceInfo(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.cpuPercent = source["cpuPercent"];
@@ -53,7 +53,7 @@ export namespace port {
 }
 
 export namespace process {
-	
+
 	export class Info {
 	    pid: number;
 	    name: string;
@@ -63,11 +63,11 @@ export namespace process {
 	    cpuPercent: number;
 	    memoryBytes: number;
 	    isProtected: boolean;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Info(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.pid = source["pid"];

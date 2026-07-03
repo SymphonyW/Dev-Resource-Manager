@@ -217,6 +217,14 @@ h1 {
     margin-bottom: 18px;
 }
 
+.port-toolbar {
+    display: grid;
+    grid-template-columns: minmax(130px, 170px) minmax(180px, 260px) minmax(130px, 170px) minmax(150px, 190px);
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 18px;
+}
+
 .filter-field {
     display: flex;
     flex-direction: column;
@@ -231,7 +239,8 @@ h1 {
     text-transform: uppercase;
 }
 
-.filter-field input {
+.filter-field input,
+.filter-field select {
     width: 100%;
     border: 1px solid #2b333d;
     border-radius: 6px;
@@ -244,7 +253,8 @@ h1 {
     padding: 8px 10px;
 }
 
-.filter-field input:focus {
+.filter-field input:focus,
+.filter-field select:focus {
     border-color: #4c8f67;
 }
 
@@ -329,6 +339,10 @@ h1 {
     background: #1d211c;
 }
 
+.dev-port-row td {
+    background: #18221e;
+}
+
 .mono {
     font-family: "Cascadia Mono", "Consolas", monospace;
 }
@@ -338,7 +352,9 @@ h1 {
 }
 
 .protected-badge,
-.standard-badge {
+.standard-badge,
+.dev-port-badge,
+.protocol-badge {
     display: inline-flex;
     align-items: center;
     border-radius: 999px;
@@ -357,6 +373,19 @@ h1 {
     border: 1px solid #2b333d;
     background: #151b21;
     color: #aab7c4;
+}
+
+.dev-port-badge {
+    margin-left: 8px;
+    border: 1px solid #305f47;
+    background: #203125;
+    color: #91efb5;
+}
+
+.protocol-badge {
+    border: 1px solid #314457;
+    background: #172331;
+    color: #9fcef8;
 }
 
 .terminate-button {
@@ -416,6 +445,10 @@ h1 {
     }
 
     .process-toolbar {
+        grid-template-columns: 1fr;
+    }
+
+    .port-toolbar {
         grid-template-columns: 1fr;
     }
 
