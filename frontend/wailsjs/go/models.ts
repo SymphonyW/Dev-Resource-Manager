@@ -1,3 +1,22 @@
+export namespace config {
+
+	export class ProtectionSettings {
+	    defaultProcessNames: string[];
+	    customProcessNames: string[];
+
+	    static createFrom(source: any = {}) {
+	        return new ProtectionSettings(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.defaultProcessNames = source["defaultProcessNames"];
+	        this.customProcessNames = source["customProcessNames"];
+	    }
+	}
+
+}
+
 export namespace main {
 
 	export class SystemResourceInfo {

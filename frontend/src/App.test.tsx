@@ -7,11 +7,17 @@ const getProcessListMock = vi.fn();
 const getPortListMock = vi.fn();
 const killProcessByPIDMock = vi.fn();
 const killProcessByPortMock = vi.fn();
+const getProtectionSettingsMock = vi.fn();
+const addCustomProtectedProcessNameMock = vi.fn();
+const deleteCustomProtectedProcessNameMock = vi.fn();
 
 vi.mock('../wailsjs/go/main/App', () => ({
+    AddCustomProtectedProcessName: (name: string) => addCustomProtectedProcessNameMock(name),
     AppName: () => new Promise(() => {}),
+    DeleteCustomProtectedProcessName: (name: string) => deleteCustomProtectedProcessNameMock(name),
     GetPortList: () => getPortListMock(),
     GetProcessList: () => getProcessListMock(),
+    GetProtectionSettings: () => getProtectionSettingsMock(),
     GetSystemResourceInfo: () => getSystemResourceInfoMock(),
     KillProcessByPID: (pid: number) => killProcessByPIDMock(pid),
     KillProcessByPort: (port: number, protocol: string) => killProcessByPortMock(port, protocol),
@@ -98,6 +104,11 @@ const portRows = [
     },
 ];
 
+const protectionSettings = {
+    defaultProcessNames: ['System', 'Registry', 'svchost.exe', 'explorer.exe', 'lsass.exe'],
+    customProcessNames: ['redis-server.exe'],
+};
+
 describe('App layout navigation', () => {
     beforeEach(() => {
         getSystemResourceInfoMock.mockReset();
@@ -126,6 +137,18 @@ describe('App layout navigation', () => {
             message: 'Process node.exe (PID 100) ended for TCP port 3000.',
             pid: 100,
             processName: 'node.exe',
+        });
+        getProtectionSettingsMock.mockReset();
+        getProtectionSettingsMock.mockResolvedValue(protectionSettings);
+        addCustomProtectedProcessNameMock.mockReset();
+        addCustomProtectedProcessNameMock.mockResolvedValue({
+            defaultProcessNames: protectionSettings.defaultProcessNames,
+            customProcessNames: ['redis-server.exe', 'webpack.exe'],
+        });
+        deleteCustomProtectedProcessNameMock.mockReset();
+        deleteCustomProtectedProcessNameMock.mockResolvedValue({
+            defaultProcessNames: protectionSettings.defaultProcessNames,
+            customProcessNames: [],
         });
     });
 
@@ -387,5 +410,49 @@ describe('App layout navigation', () => {
 
         fireEvent.click(screen.getByRole('button', {name: 'Refresh Ports'}));
         expect(await screen.findByText('Unable to load port list.')).toBeInTheDocument();
+    });
+
+    it('loads Settings protection lists and keeps default entries read-only', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Settings'}));
+
+        expect(await screen.findByRole('heading', {name: 'Settings'})).toBeInTheDocument();
+        expect(await screen.findByText('System')).toBeInTheDocument();
+        expect(screen.getByText('svchost.exe')).toBeInTheDocument();
+        expect(screen.getByText('redis-server.exe')).toBeInTheDocument();
+
+        const defaultList = screen.getByLabelText('Default protected process list');
+        const customList = screen.getByLabelText('Custom protected process list');
+
+        expect(within(defaultList).queryByRole('button', {name: /delete/i})).not.toBeInTheDocument();
+        expect(within(customList).getByRole('button', {name: 'Delete redis-server.exe'})).toBeInTheDocument();
+    });
+
+    it('adds a custom protected process from Settings', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Settings'}));
+        expect(await screen.findByText('redis-server.exe')).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Custom protected process name'), {target: {value: 'webpack.exe'}});
+        fireEvent.click(screen.getByRole('button', {name: 'Add protected process'}));
+
+        await waitFor(() => expect(addCustomProtectedProcessNameMock).toHaveBeenCalledWith('webpack.exe'));
+        expect(await screen.findByText('webpack.exe')).toBeInTheDocument();
+        expect(screen.getByText('Custom protected process added.')).toBeInTheDocument();
+    });
+
+    it('deletes a custom protected process from Settings', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Settings'}));
+        expect(await screen.findByText('redis-server.exe')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', {name: 'Delete redis-server.exe'}));
+
+        await waitFor(() => expect(deleteCustomProtectedProcessNameMock).toHaveBeenCalledWith('redis-server.exe'));
+        expect(await screen.findByText('No custom protected processes yet.')).toBeInTheDocument();
+        expect(screen.getByText('Custom protected process removed.')).toBeInTheDocument();
     });
 });

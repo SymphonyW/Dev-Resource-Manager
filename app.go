@@ -5,6 +5,7 @@ import (
 	"math"
 	"time"
 
+	"dev-resource-manager/internal/config"
 	portscanner "dev-resource-manager/internal/port"
 	processscanner "dev-resource-manager/internal/process"
 
@@ -96,12 +97,13 @@ func roundOneDecimal(value float64) float64 {
 
 // GetProcessList returns the current Windows process list for the frontend.
 func (a *App) GetProcessList() ([]processscanner.Info, error) {
-	ctx := a.ctx
-	if ctx == nil {
-		ctx = context.Background()
+	ctx := a.appContext()
+	rules, err := a.loadProtectionRules(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	processes, err := processscanner.List(ctx)
+	processes, err := processscanner.ListWithProtector(ctx, rules)
 	if err != nil {
 		return nil, err
 	}
@@ -111,12 +113,13 @@ func (a *App) GetProcessList() ([]processscanner.Info, error) {
 
 // GetPortList returns the current Windows TCP/UDP port occupancy list for the frontend.
 func (a *App) GetPortList() ([]portscanner.Info, error) {
-	ctx := a.ctx
-	if ctx == nil {
-		ctx = context.Background()
+	ctx := a.appContext()
+	rules, err := a.loadProtectionRules(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	ports, err := portscanner.List(ctx)
+	ports, err := portscanner.ListWithProtector(ctx, rules)
 	if err != nil {
 		return nil, err
 	}
@@ -126,20 +129,85 @@ func (a *App) GetPortList() ([]portscanner.Info, error) {
 
 // KillProcessByPID ends a non-protected process by PID and returns an operation result.
 func (a *App) KillProcessByPID(pid int) processscanner.OperationResult {
-	ctx := a.ctx
-	if ctx == nil {
-		ctx = context.Background()
+	ctx := a.appContext()
+	rules, err := a.loadProtectionRules(ctx)
+	if err != nil {
+		return processscanner.OperationResult{
+			Success: false,
+			Message: "Unable to load process protection rules before ending process: " + err.Error(),
+			PID:     pid,
+		}
 	}
 
-	return processscanner.KillByPID(ctx, pid)
+	return processscanner.KillByPIDWithProtector(ctx, pid, rules)
 }
 
 // KillProcessByPort resolves a port owner and ends the owning process if it is allowed.
 func (a *App) KillProcessByPort(port int, protocol string) processscanner.OperationResult {
-	ctx := a.ctx
-	if ctx == nil {
-		ctx = context.Background()
+	ctx := a.appContext()
+	rules, err := a.loadProtectionRules(ctx)
+	if err != nil {
+		return processscanner.OperationResult{
+			Success: false,
+			Message: "Unable to load process protection rules before ending port occupancy: " + err.Error(),
+		}
 	}
 
-	return portscanner.KillProcessByPort(ctx, port, protocol)
+	return portscanner.KillProcessByPortWithProtector(ctx, port, protocol, rules)
+}
+
+// GetProtectionSettings returns the built-in and user-managed protected process names.
+func (a *App) GetProtectionSettings() (config.ProtectionSettings, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return config.ProtectionSettings{}, err
+	}
+	defer store.Close()
+
+	return store.GetProtectionSettings(a.appContext())
+}
+
+// AddCustomProtectedProcessName adds a user-managed protected process name.
+func (a *App) AddCustomProtectedProcessName(name string) (config.ProtectionSettings, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return config.ProtectionSettings{}, err
+	}
+	defer store.Close()
+
+	return store.AddCustomProtectedProcessName(a.appContext(), name)
+}
+
+// DeleteCustomProtectedProcessName removes a user-managed protected process name.
+func (a *App) DeleteCustomProtectedProcessName(name string) (config.ProtectionSettings, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return config.ProtectionSettings{}, err
+	}
+	defer store.Close()
+
+	return store.DeleteCustomProtectedProcessName(a.appContext(), name)
+}
+
+func (a *App) appContext() context.Context {
+	if a.ctx == nil {
+		return context.Background()
+	}
+
+	return a.ctx
+}
+
+func (a *App) loadProtectionRules(ctx context.Context) (config.ProtectionRules, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return config.ProtectionRules{}, err
+	}
+	defer store.Close()
+
+	rules, err := store.LoadProtectionRules(ctx)
+	if err != nil {
+		return config.ProtectionRules{}, err
+	}
+
+	return rules, nil
 }

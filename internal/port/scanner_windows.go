@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"dev-resource-manager/internal/config"
 	processscanner "dev-resource-manager/internal/process"
 
 	gopsnet "github.com/shirou/gopsutil/v3/net"
@@ -23,11 +24,24 @@ type processInfo struct {
 
 // List scans Windows TCP and UDP port ownership and returns a best-effort snapshot.
 func List(ctx context.Context) ([]Info, error) {
+	rules, err := config.LoadDefaultProtectionRules(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load port protection rules: %w", err)
+	}
+
+	return ListWithProtector(ctx, rules)
+}
+
+// ListWithProtector scans Windows port ownership using the supplied protection rules.
+func ListWithProtector(ctx context.Context, protector processscanner.Protector) ([]Info, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("scan Windows ports: %w", err)
+	}
+	if protector == nil {
+		protector = config.DefaultProtectionRules()
 	}
 
 	tcpConnections, err := gopsnet.ConnectionsWithContext(ctx, "tcp")
@@ -40,7 +54,7 @@ func List(ctx context.Context) ([]Info, error) {
 		return nil, fmt.Errorf("scan Windows UDP ports: %w; try running as administrator if Windows denied access to connection tables", err)
 	}
 
-	processes := buildProcessIndex(ctx, tcpConnections, udpConnections)
+	processes := buildProcessIndex(ctx, protector, tcpConnections, udpConnections)
 	ports := make([]Info, 0, len(tcpConnections)+len(udpConnections))
 	seen := make(map[string]struct{})
 
@@ -98,7 +112,7 @@ func appendConnections(ports []Info, connections []gopsnet.ConnectionStat, proto
 	return ports
 }
 
-func buildProcessIndex(ctx context.Context, connectionGroups ...[]gopsnet.ConnectionStat) map[int32]processInfo {
+func buildProcessIndex(ctx context.Context, protector processscanner.Protector, connectionGroups ...[]gopsnet.ConnectionStat) map[int32]processInfo {
 	pids := make(map[int32]struct{})
 	for _, connections := range connectionGroups {
 		for _, connection := range connections {
@@ -118,13 +132,13 @@ func buildProcessIndex(ctx context.Context, connectionGroups ...[]gopsnet.Connec
 		info := processInfo{}
 		if name, err := process.NameWithContext(ctx); err == nil {
 			info.name = strings.TrimSpace(name)
-			info.isProtected = processscanner.IsProtectedName(info.name)
+			info.isProtected = protector.IsProtectedName(info.name)
 		}
 		if path, err := process.ExeWithContext(ctx); err == nil {
 			info.path = strings.TrimSpace(path)
 			if info.name == "" {
 				info.name = filepath.Base(path)
-				info.isProtected = processscanner.IsProtectedName(info.name)
+				info.isProtected = protector.IsProtectedName(info.name)
 			}
 		}
 

@@ -7,7 +7,7 @@ import (
 )
 
 func TestGetSystemResourceInfoReturnsResourceSnapshot(t *testing.T) {
-	app := NewApp()
+	app := newTestApp(t)
 
 	info := app.GetSystemResourceInfo()
 
@@ -26,7 +26,7 @@ func TestGetSystemResourceInfoReturnsResourceSnapshot(t *testing.T) {
 }
 
 func TestGetProcessListReturnsCurrentProcesses(t *testing.T) {
-	app := NewApp()
+	app := newTestApp(t)
 
 	processes, err := app.GetProcessList()
 	if err != nil {
@@ -52,7 +52,7 @@ func TestGetPortListReturnsCurrentTCPListener(t *testing.T) {
 	listener, port := listenOnLocalTCPPortForAppTest(t)
 	defer listener.Close()
 
-	app := NewApp()
+	app := newTestApp(t)
 	deadline := time.Now().Add(3 * time.Second)
 
 	for {
@@ -76,7 +76,7 @@ func TestGetPortListReturnsCurrentTCPListener(t *testing.T) {
 }
 
 func TestKillProcessByPIDReturnsFailureForInvalidPID(t *testing.T) {
-	app := NewApp()
+	app := newTestApp(t)
 
 	result := app.KillProcessByPID(-1)
 
@@ -89,6 +89,57 @@ func TestKillProcessByPIDReturnsFailureForInvalidPID(t *testing.T) {
 	if result.Message == "" {
 		t.Fatalf("expected failure message")
 	}
+}
+
+func TestProtectionSettingsManageCustomProtectedProcesses(t *testing.T) {
+	app := newTestApp(t)
+
+	settings, err := app.GetProtectionSettings()
+	if err != nil {
+		t.Fatalf("get protection settings: %v", err)
+	}
+	if len(settings.DefaultProcessNames) == 0 {
+		t.Fatalf("expected default protected processes")
+	}
+	if len(settings.CustomProcessNames) != 0 {
+		t.Fatalf("expected no custom protected processes, got %v", settings.CustomProcessNames)
+	}
+
+	settings, err = app.AddCustomProtectedProcessName("worker.exe")
+	if err != nil {
+		t.Fatalf("add custom protected process: %v", err)
+	}
+	if !containsAppTestString(settings.CustomProcessNames, "worker.exe") {
+		t.Fatalf("expected worker.exe in custom protected processes, got %v", settings.CustomProcessNames)
+	}
+
+	settings, err = app.DeleteCustomProtectedProcessName("WORKER.EXE")
+	if err != nil {
+		t.Fatalf("delete custom protected process: %v", err)
+	}
+	if containsAppTestString(settings.CustomProcessNames, "worker.exe") {
+		t.Fatalf("expected worker.exe to be removed, got %v", settings.CustomProcessNames)
+	}
+}
+
+func newTestApp(t *testing.T) *App {
+	t.Helper()
+
+	configDir := t.TempDir()
+	t.Setenv("APPDATA", configDir)
+	t.Setenv("XDG_CONFIG_HOME", configDir)
+
+	return NewApp()
+}
+
+func containsAppTestString(values []string, expected string) bool {
+	for _, value := range values {
+		if value == expected {
+			return true
+		}
+	}
+
+	return false
 }
 
 func listenOnLocalTCPPortForAppTest(t *testing.T) (net.Listener, int) {
