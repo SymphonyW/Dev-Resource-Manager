@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"strings"
 
+	"dev-resource-manager/internal/config"
+
 	gopsprocess "github.com/shirou/gopsutil/v3/process"
 	"golang.org/x/sys/windows"
 )
@@ -44,12 +46,33 @@ func (gopsutilKillOperations) killWithContext(ctx context.Context, pid int32) er
 
 // KillByPID terminates a non-protected Windows process by PID.
 func KillByPID(ctx context.Context, pid int) OperationResult {
-	return killByPID(ctx, pid, gopsutilKillOperations{})
+	rules, err := config.LoadDefaultProtectionRules(ctx)
+	if err != nil {
+		return OperationResult{
+			Success: false,
+			Message: fmt.Sprintf("Unable to load process protection rules before ending PID %d: %v", pid, err),
+			PID:     pid,
+		}
+	}
+
+	return KillByPIDWithProtector(ctx, pid, rules)
+}
+
+// KillByPIDWithProtector terminates a non-protected Windows process using supplied protection rules.
+func KillByPIDWithProtector(ctx context.Context, pid int, protector Protector) OperationResult {
+	return killByPIDWithOperations(ctx, pid, gopsutilKillOperations{}, protector)
 }
 
 func killByPID(ctx context.Context, pid int, ops killOperations) OperationResult {
+	return killByPIDWithOperations(ctx, pid, ops, config.DefaultProtectionRules())
+}
+
+func killByPIDWithOperations(ctx context.Context, pid int, ops killOperations, protector Protector) OperationResult {
 	if ctx == nil {
 		ctx = context.Background()
+	}
+	if protector == nil {
+		protector = config.DefaultProtectionRules()
 	}
 
 	result := OperationResult{PID: pid}
@@ -85,7 +108,7 @@ func killByPID(ctx context.Context, pid int, ops killOperations) OperationResult
 	processName = strings.TrimSpace(processName)
 	result.ProcessName = processName
 
-	if IsProtectedName(processName) {
+	if protector.IsProtectedName(processName) {
 		result.Message = fmt.Sprintf("Process %s (PID %d) is protected and cannot be ended.", displayProcessName(processName), pid)
 		return result
 	}
