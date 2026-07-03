@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import {formatMemorySize, formatPercent} from '../services/systemResources';
-import {loadProcessList} from '../services/processes';
+import {killProcessByPID, loadProcessList} from '../services/processes';
 import type {PageDefinition} from '../types/navigation';
 import type {ProcessInfo, ProcessSortKey} from '../types/processes';
 
@@ -14,7 +14,10 @@ function ProcessesPage({page}: ProcessesPageProps) {
     const [pidSearch, setPidSearch] = useState('');
     const [sortKey, setSortKey] = useState<ProcessSortKey>('memory');
     const [isLoading, setIsLoading] = useState(false);
+    const [isKilling, setIsKilling] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    const [operationMessage, setOperationMessage] = useState('');
+    const [processToKill, setProcessToKill] = useState<ProcessInfo | null>(null);
 
     const loadProcesses = useCallback(async () => {
         setIsLoading(true);
@@ -34,6 +37,40 @@ function ProcessesPage({page}: ProcessesPageProps) {
     useEffect(() => {
         void loadProcesses();
     }, [loadProcesses]);
+
+    const openKillConfirmation = (process: ProcessInfo) => {
+        setOperationMessage('');
+        setProcessToKill(process);
+    };
+
+    const closeKillConfirmation = () => {
+        if (!isKilling) {
+            setProcessToKill(null);
+        }
+    };
+
+    const confirmKillProcess = async () => {
+        if (!processToKill) {
+            return;
+        }
+
+        setIsKilling(true);
+        setErrorMessage('');
+
+        try {
+            const result = await killProcessByPID(processToKill.pid);
+            setOperationMessage(result.message);
+            setProcessToKill(null);
+
+            if (result.success) {
+                await loadProcesses();
+            }
+        } catch {
+            setOperationMessage('Unable to end process.');
+        } finally {
+            setIsKilling(false);
+        }
+    };
 
     const visibleProcesses = useMemo(() => {
         const normalizedNameSearch = nameSearch.trim().toLowerCase();
@@ -120,6 +157,7 @@ function ProcessesPage({page}: ProcessesPageProps) {
             </div>
 
             {errorMessage && <p className="resource-error">{errorMessage}</p>}
+            {operationMessage && <p className="operation-message">{operationMessage}</p>}
             {isLoading && processes.length === 0 && <p className="resource-loading">Loading process list...</p>}
 
             {!isLoading && !errorMessage && visibleProcesses.length === 0 && (
@@ -158,14 +196,78 @@ function ProcessesPage({page}: ProcessesPageProps) {
                                         </span>
                                     </td>
                                     <td>
-                                        <button className="terminate-button" type="button" disabled>
-                                            Terminate
+                                        <button
+                                            className="terminate-button"
+                                            type="button"
+                                            disabled={process.isProtected || isKilling}
+                                            onClick={() => openKillConfirmation(process)}
+                                        >
+                                            结束进程
                                         </button>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
+                </div>
+            )}
+
+            {processToKill && (
+                <div className="modal-backdrop" role="presentation">
+                    <section
+                        aria-labelledby="kill-process-dialog-title"
+                        className="confirmation-dialog"
+                        role="dialog"
+                    >
+                        <div className="dialog-header">
+                            <h2 id="kill-process-dialog-title">Confirm process termination</h2>
+                            <button
+                                aria-label="Close"
+                                className="dialog-close-button"
+                                type="button"
+                                onClick={closeKillConfirmation}
+                                disabled={isKilling}
+                            >
+                                Close
+                            </button>
+                        </div>
+                        <dl className="confirmation-details">
+                            <div>
+                                <dt>PID</dt>
+                                <dd className="mono">{processToKill.pid}</dd>
+                            </div>
+                            <div>
+                                <dt>Process Name</dt>
+                                <dd>{processToKill.name || 'Unknown'}</dd>
+                            </div>
+                            <div>
+                                <dt>Path</dt>
+                                <dd>{processToKill.path || 'Unavailable'}</dd>
+                            </div>
+                            <div>
+                                <dt>Memory</dt>
+                                <dd className="mono">{formatMemorySize(processToKill.memoryBytes)}</dd>
+                            </div>
+                        </dl>
+                        <div className="dialog-actions">
+                            <button
+                                className="sort-button"
+                                type="button"
+                                onClick={closeKillConfirmation}
+                                disabled={isKilling}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="danger-button"
+                                type="button"
+                                onClick={confirmKillProcess}
+                                disabled={isKilling}
+                            >
+                                Confirm End Process
+                            </button>
+                        </div>
+                    </section>
                 </div>
             )}
         </section>

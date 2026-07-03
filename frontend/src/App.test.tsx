@@ -1,14 +1,28 @@
-import {fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {fireEvent, render, screen, waitFor, within} from '@testing-library/react';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import App from './App';
 
 const getSystemResourceInfoMock = vi.fn();
 const getProcessListMock = vi.fn();
+const getPortListMock = vi.fn();
+const killProcessByPIDMock = vi.fn();
+const killProcessByPortMock = vi.fn();
+const getProtectionSettingsMock = vi.fn();
+const addCustomProtectedProcessNameMock = vi.fn();
+const deleteCustomProtectedProcessNameMock = vi.fn();
+const getOperationLogsMock = vi.fn();
 
 vi.mock('../wailsjs/go/main/App', () => ({
+    AddCustomProtectedProcessName: (name: string) => addCustomProtectedProcessNameMock(name),
     AppName: () => new Promise(() => {}),
+    DeleteCustomProtectedProcessName: (name: string) => deleteCustomProtectedProcessNameMock(name),
+    GetOperationLogs: () => getOperationLogsMock(),
+    GetPortList: () => getPortListMock(),
     GetProcessList: () => getProcessListMock(),
+    GetProtectionSettings: () => getProtectionSettingsMock(),
     GetSystemResourceInfo: () => getSystemResourceInfoMock(),
+    KillProcessByPID: (pid: number) => killProcessByPIDMock(pid),
+    KillProcessByPort: (port: number, protocol: string) => killProcessByPortMock(port, protocol),
 }));
 
 const processRows = [
@@ -44,6 +58,82 @@ const processRows = [
     },
 ];
 
+const portRows = [
+    {
+        port: 3000,
+        protocol: 'TCP',
+        status: 'LISTEN',
+        pid: 100,
+        processName: 'node.exe',
+        processPath: 'C:\\Program Files\\nodejs\\node.exe',
+        isProtected: false,
+    },
+    {
+        port: 5432,
+        protocol: 'TCP',
+        status: 'LISTEN',
+        pid: 200,
+        processName: 'postgres.exe',
+        processPath: 'C:\\PostgreSQL\\bin\\postgres.exe',
+        isProtected: false,
+    },
+    {
+        port: 5353,
+        protocol: 'UDP',
+        status: 'LISTEN',
+        pid: 300,
+        processName: 'dns-sd.exe',
+        processPath: '',
+        isProtected: false,
+    },
+    {
+        port: 9000,
+        protocol: 'TCP',
+        status: 'ESTABLISHED',
+        pid: 400,
+        processName: 'custom-api.exe',
+        processPath: 'C:\\dev\\custom-api.exe',
+        isProtected: false,
+    },
+    {
+        port: 135,
+        protocol: 'TCP',
+        status: 'LISTEN',
+        pid: 456,
+        processName: 'svchost.exe',
+        processPath: 'C:\\Windows\\System32\\svchost.exe',
+        isProtected: true,
+    },
+];
+
+const protectionSettings = {
+    defaultProcessNames: ['System', 'Registry', 'svchost.exe', 'explorer.exe', 'lsass.exe'],
+    customProcessNames: ['redis-server.exe'],
+};
+
+const operationLogs = [
+    {
+        id: 2,
+        action: 'kill_process_by_port',
+        pid: 100,
+        processName: 'node.exe',
+        port: 3000,
+        result: 'success',
+        message: 'Process node.exe (PID 100) ended for TCP port 3000.',
+        createdAt: '2026-07-03T09:05:00Z',
+    },
+    {
+        id: 1,
+        action: 'kill_process_by_pid',
+        pid: -1,
+        processName: '',
+        port: 0,
+        result: 'failure',
+        message: 'PID -1 is invalid.',
+        createdAt: '2026-07-03T09:00:00Z',
+    },
+];
+
 describe('App layout navigation', () => {
     beforeEach(() => {
         getSystemResourceInfoMock.mockReset();
@@ -57,6 +147,36 @@ describe('App layout navigation', () => {
         });
         getProcessListMock.mockReset();
         getProcessListMock.mockResolvedValue(processRows);
+        getPortListMock.mockReset();
+        getPortListMock.mockResolvedValue(portRows);
+        killProcessByPIDMock.mockReset();
+        killProcessByPIDMock.mockResolvedValue({
+            success: true,
+            message: 'Process node.exe (PID 100) ended.',
+            pid: 100,
+            processName: 'node.exe',
+        });
+        killProcessByPortMock.mockReset();
+        killProcessByPortMock.mockResolvedValue({
+            success: true,
+            message: 'Process node.exe (PID 100) ended for TCP port 3000.',
+            pid: 100,
+            processName: 'node.exe',
+        });
+        getProtectionSettingsMock.mockReset();
+        getProtectionSettingsMock.mockResolvedValue(protectionSettings);
+        addCustomProtectedProcessNameMock.mockReset();
+        addCustomProtectedProcessNameMock.mockResolvedValue({
+            defaultProcessNames: protectionSettings.defaultProcessNames,
+            customProcessNames: ['redis-server.exe', 'webpack.exe'],
+        });
+        deleteCustomProtectedProcessNameMock.mockReset();
+        deleteCustomProtectedProcessNameMock.mockResolvedValue({
+            defaultProcessNames: protectionSettings.defaultProcessNames,
+            customProcessNames: [],
+        });
+        getOperationLogsMock.mockReset();
+        getOperationLogsMock.mockResolvedValue(operationLogs);
     });
 
     it('renders all primary navigation pages and highlights Dashboard by default', async () => {
@@ -79,6 +199,7 @@ describe('App layout navigation', () => {
         expect(screen.getByRole('button', {name: 'Ports'})).toHaveAttribute('aria-current', 'page');
         expect(screen.getByRole('heading', {name: 'Ports'})).toBeInTheDocument();
         expect(screen.getByText('Review local TCP and UDP port usage and the owning process.')).toBeInTheDocument();
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
     });
 
     it('loads Dashboard resource metrics and refreshes them on demand', async () => {
@@ -118,7 +239,7 @@ describe('App layout navigation', () => {
         expect(screen.getByText('42')).toBeInTheDocument();
     });
 
-    it('loads Processes into a table with protected markers and disabled actions', async () => {
+    it('loads Processes into a table with protected markers and protected actions disabled', async () => {
         render(<App/>);
 
         fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
@@ -127,8 +248,14 @@ describe('App layout navigation', () => {
         expect(await screen.findByText('node.exe')).toBeInTheDocument();
         expect(screen.getByText('System')).toBeInTheDocument();
         expect(screen.getAllByText('Protected').length).toBeGreaterThan(1);
-        expect(screen.getAllByRole('button', {name: 'Terminate'})).toHaveLength(3);
-        expect(screen.getAllByRole('button', {name: 'Terminate'}).every((button) => button.hasAttribute('disabled'))).toBe(true);
+
+        const systemRow = screen.getByText('System').closest('tr');
+        const nodeRow = screen.getByText('node.exe').closest('tr');
+
+        expect(systemRow).not.toBeNull();
+        expect(nodeRow).not.toBeNull();
+        expect(within(systemRow as HTMLTableRowElement).getByRole('button', {name: '结束进程'})).toBeDisabled();
+        expect(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: '结束进程'})).not.toBeDisabled();
     });
 
     it('filters Processes by name and PID', async () => {
@@ -176,5 +303,205 @@ describe('App layout navigation', () => {
 
         fireEvent.click(screen.getByRole('button', {name: 'Refresh Processes'}));
         expect(await screen.findByText('Unable to load process list.')).toBeInTheDocument();
+    });
+
+    it('confirms before ending a process and shows operation result', async () => {
+        getProcessListMock
+            .mockResolvedValueOnce(processRows)
+            .mockResolvedValueOnce(processRows.filter((process) => process.pid !== 100));
+
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+
+        const nodeRow = screen.getByText('node.exe').closest('tr');
+        expect(nodeRow).not.toBeNull();
+        fireEvent.click(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: '结束进程'}));
+
+        const dialog = screen.getByRole('dialog', {name: 'Confirm process termination'});
+        expect(within(dialog).getByText('PID')).toBeInTheDocument();
+        expect(within(dialog).getByText('100')).toBeInTheDocument();
+        expect(within(dialog).getByText('node.exe')).toBeInTheDocument();
+        expect(within(dialog).getByText('C:\\Program Files\\nodejs\\node.exe')).toBeInTheDocument();
+        expect(within(dialog).getByText('512.0 MB')).toBeInTheDocument();
+
+        fireEvent.click(within(dialog).getByRole('button', {name: 'Confirm End Process'}));
+
+        await waitFor(() => expect(killProcessByPIDMock).toHaveBeenCalledWith(100));
+        expect(await screen.findByText('Process node.exe (PID 100) ended.')).toBeInTheDocument();
+        expect(screen.queryByRole('dialog', {name: 'Confirm process termination'})).not.toBeInTheDocument();
+    });
+
+    it('loads Ports into a table with common dev port markers and protected actions disabled', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
+
+        expect(await screen.findByRole('heading', {name: 'Ports'})).toBeInTheDocument();
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+        expect(screen.getByText('3000')).toBeInTheDocument();
+        expect(screen.getByText('5432')).toBeInTheDocument();
+        expect(screen.getAllByText('Dev port')).toHaveLength(2);
+
+        const nodeRow = screen.getByText('node.exe').closest('tr');
+        const protectedRow = screen.getByText('svchost.exe').closest('tr');
+
+        expect(nodeRow).not.toBeNull();
+        expect(protectedRow).not.toBeNull();
+        expect(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End port occupancy'})).not.toBeDisabled();
+        expect(within(protectedRow as HTMLTableRowElement).getByRole('button', {name: 'End port occupancy'})).toBeDisabled();
+    });
+
+    it('confirms before ending a port occupant and refreshes the port list', async () => {
+        getPortListMock
+            .mockResolvedValueOnce(portRows)
+            .mockResolvedValueOnce(portRows.filter((port) => port.port !== 3000));
+
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+
+        const nodeRow = screen.getByText('node.exe').closest('tr');
+        expect(nodeRow).not.toBeNull();
+        fireEvent.click(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End port occupancy'}));
+
+        const dialog = screen.getByRole('dialog', {name: 'Confirm port occupancy termination'});
+        expect(within(dialog).getByText('Port')).toBeInTheDocument();
+        expect(within(dialog).getByText('3000')).toBeInTheDocument();
+        expect(within(dialog).getByText('TCP')).toBeInTheDocument();
+        expect(within(dialog).getByText('100')).toBeInTheDocument();
+        expect(within(dialog).getByText('node.exe')).toBeInTheDocument();
+        expect(within(dialog).getByText('C:\\Program Files\\nodejs\\node.exe')).toBeInTheDocument();
+
+        fireEvent.click(within(dialog).getByRole('button', {name: 'Confirm End Occupancy'}));
+
+        await waitFor(() => expect(killProcessByPortMock).toHaveBeenCalledWith(3000, 'TCP'));
+        expect(await screen.findByText('Process node.exe (PID 100) ended for TCP port 3000.')).toBeInTheDocument();
+        expect(screen.queryByRole('dialog', {name: 'Confirm port occupancy termination'})).not.toBeInTheDocument();
+        await waitFor(() => expect(getPortListMock).toHaveBeenCalledTimes(2));
+    });
+
+    it('filters Ports by port number and process name', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Search by port number'), {target: {value: '5432'}});
+        expect(screen.getByText('postgres.exe')).toBeInTheDocument();
+        expect(screen.queryByText('node.exe')).not.toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Search by port number'), {target: {value: ''}});
+        fireEvent.change(screen.getByLabelText('Search by process name'), {target: {value: 'custom'}});
+        expect(screen.getByText('custom-api.exe')).toBeInTheDocument();
+        expect(screen.queryByText('postgres.exe')).not.toBeInTheDocument();
+    });
+
+    it('filters Ports by protocol and status', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
+        expect(await screen.findByText('dns-sd.exe')).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Filter by protocol'), {target: {value: 'UDP'}});
+        expect(screen.getByText('dns-sd.exe')).toBeInTheDocument();
+        expect(screen.queryByText('node.exe')).not.toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Filter by protocol'), {target: {value: 'all'}});
+        fireEvent.change(screen.getByLabelText('Filter by status'), {target: {value: 'ESTABLISHED'}});
+        expect(screen.getByText('custom-api.exe')).toBeInTheDocument();
+        expect(screen.queryByText('postgres.exe')).not.toBeInTheDocument();
+    });
+
+    it('refreshes Ports and handles loading empty and error states', async () => {
+        let resolveInitialPorts: (value: typeof portRows) => void = () => {};
+        getPortListMock
+            .mockReturnValueOnce(new Promise<typeof portRows>((resolve) => {
+                resolveInitialPorts = resolve;
+            }))
+            .mockResolvedValueOnce([])
+            .mockRejectedValueOnce(new Error('scan failed'));
+
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
+        expect(await screen.findByText('Loading port list...')).toBeInTheDocument();
+
+        resolveInitialPorts(portRows);
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', {name: 'Refresh Ports'}));
+        expect(await screen.findByText('No ports found.')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', {name: 'Refresh Ports'}));
+        expect(await screen.findByText('Unable to load port list.')).toBeInTheDocument();
+    });
+
+    it('loads Settings protection lists and keeps default entries read-only', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Settings'}));
+
+        expect(await screen.findByRole('heading', {name: 'Settings'})).toBeInTheDocument();
+        expect(await screen.findByText('System')).toBeInTheDocument();
+        expect(screen.getByText('svchost.exe')).toBeInTheDocument();
+        expect(screen.getByText('redis-server.exe')).toBeInTheDocument();
+
+        const defaultList = screen.getByLabelText('Default protected process list');
+        const customList = screen.getByLabelText('Custom protected process list');
+
+        expect(within(defaultList).queryByRole('button', {name: /delete/i})).not.toBeInTheDocument();
+        expect(within(customList).getByRole('button', {name: 'Delete redis-server.exe'})).toBeInTheDocument();
+    });
+
+    it('adds a custom protected process from Settings', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Settings'}));
+        expect(await screen.findByText('redis-server.exe')).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Custom protected process name'), {target: {value: 'webpack.exe'}});
+        fireEvent.click(screen.getByRole('button', {name: 'Add protected process'}));
+
+        await waitFor(() => expect(addCustomProtectedProcessNameMock).toHaveBeenCalledWith('webpack.exe'));
+        expect(await screen.findByText('webpack.exe')).toBeInTheDocument();
+        expect(screen.getByText('Custom protected process added.')).toBeInTheDocument();
+    });
+
+    it('deletes a custom protected process from Settings', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Settings'}));
+        expect(await screen.findByText('redis-server.exe')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', {name: 'Delete redis-server.exe'}));
+
+        await waitFor(() => expect(deleteCustomProtectedProcessNameMock).toHaveBeenCalledWith('redis-server.exe'));
+        expect(await screen.findByText('No custom protected processes yet.')).toBeInTheDocument();
+        expect(screen.getByText('Custom protected process removed.')).toBeInTheDocument();
+    });
+
+    it('loads Logs in newest-first order and refreshes them', async () => {
+        getOperationLogsMock
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce(operationLogs);
+
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Logs'}));
+
+        expect(await screen.findByRole('heading', {name: 'Logs'})).toBeInTheDocument();
+        expect(await screen.findByText('No operation logs found.')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', {name: 'Refresh Logs'}));
+
+        expect(await screen.findByText('kill_process_by_port')).toBeInTheDocument();
+        expect(screen.getByText('kill_process_by_pid')).toBeInTheDocument();
+        expect(screen.getByText('Process node.exe (PID 100) ended for TCP port 3000.')).toBeInTheDocument();
+        expect(screen.getByText('PID -1 is invalid.')).toBeInTheDocument();
+        expect(screen.getAllByTestId('operation-log-action')[0]).toHaveTextContent('kill_process_by_port');
+        await waitFor(() => expect(getOperationLogsMock).toHaveBeenCalledTimes(2));
     });
 });

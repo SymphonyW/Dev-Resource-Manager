@@ -181,6 +181,14 @@ h1 {
     color: #f39b9b;
 }
 
+.operation-message {
+    border-top: 1px solid #2b333d;
+    margin: 0 0 18px;
+    padding-top: 18px;
+    color: #91efb5;
+    font-size: 14px;
+}
+
 .resource-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(150px, 1fr));
@@ -217,6 +225,26 @@ h1 {
     margin-bottom: 18px;
 }
 
+.port-toolbar {
+    display: grid;
+    grid-template-columns: minmax(130px, 170px) minmax(180px, 260px) minmax(130px, 170px) minmax(150px, 190px);
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 18px;
+}
+
+.settings-page {
+    max-width: 1040px;
+}
+
+.settings-add-form {
+    display: grid;
+    grid-template-columns: minmax(220px, 340px) auto;
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 18px;
+}
+
 .filter-field {
     display: flex;
     flex-direction: column;
@@ -231,7 +259,8 @@ h1 {
     text-transform: uppercase;
 }
 
-.filter-field input {
+.filter-field input,
+.filter-field select {
     width: 100%;
     border: 1px solid #2b333d;
     border-radius: 6px;
@@ -244,7 +273,8 @@ h1 {
     padding: 8px 10px;
 }
 
-.filter-field input:focus {
+.filter-field input:focus,
+.filter-field select:focus {
     border-color: #4c8f67;
 }
 
@@ -329,6 +359,10 @@ h1 {
     background: #1d211c;
 }
 
+.dev-port-row td {
+    background: #18221e;
+}
+
 .mono {
     font-family: "Cascadia Mono", "Consolas", monospace;
 }
@@ -338,7 +372,10 @@ h1 {
 }
 
 .protected-badge,
-.standard-badge {
+.standard-badge,
+.dev-port-badge,
+.protocol-badge,
+.result-badge {
     display: inline-flex;
     align-items: center;
     border-radius: 999px;
@@ -359,9 +396,211 @@ h1 {
     color: #aab7c4;
 }
 
+.dev-port-badge {
+    margin-left: 8px;
+    border: 1px solid #305f47;
+    background: #203125;
+    color: #91efb5;
+}
+
+.protocol-badge {
+    border: 1px solid #314457;
+    background: #172331;
+    color: #9fcef8;
+}
+
+.result-badge.success {
+    border: 1px solid #305f47;
+    background: #203125;
+    color: #91efb5;
+}
+
+.result-badge.failure {
+    border: 1px solid #6f3737;
+    background: #2a1818;
+    color: #f3a6a6;
+}
+
 .terminate-button {
+    cursor: pointer;
+}
+
+.terminate-button:disabled {
     cursor: not-allowed;
     opacity: 0.55;
+}
+
+.danger-button {
+    border: 1px solid #6f3737;
+    border-radius: 6px;
+    background: #2a1818;
+    color: #f3a6a6;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    min-height: 38px;
+    padding: 8px 12px;
+}
+
+.danger-button:hover:not(:disabled) {
+    border-color: #9a4b4b;
+    background: #351d1d;
+}
+
+.danger-button:disabled {
+    cursor: wait;
+    opacity: 0.64;
+}
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(5, 8, 12, 0.72);
+    padding: 20px;
+}
+
+.confirmation-dialog {
+    width: min(520px, 100%);
+    border: 1px solid #2b333d;
+    border-radius: 6px;
+    background: #151b21;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.36);
+    padding: 20px;
+}
+
+.dialog-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.dialog-header h2 {
+    margin: 0;
+    color: #f5f8fb;
+    font-size: 19px;
+}
+
+.dialog-close-button {
+    border: 1px solid #2b333d;
+    border-radius: 6px;
+    background: #101418;
+    color: #aab7c4;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 9px;
+}
+
+.dialog-close-button:disabled {
+    cursor: wait;
+    opacity: 0.64;
+}
+
+.confirmation-details {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+}
+
+.confirmation-details div {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: 12px;
+    border-top: 1px solid #252c34;
+    padding-top: 10px;
+}
+
+.confirmation-details dt {
+    color: #8ea0b3;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.confirmation-details dd {
+    margin: 0;
+    color: #d6dee6;
+    overflow-wrap: anywhere;
+}
+
+.dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.settings-section {
+    border: 1px solid #2b333d;
+    border-radius: 6px;
+    background: #151b21;
+    min-width: 0;
+}
+
+.settings-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    border-bottom: 1px solid #252c34;
+    padding: 15px 16px;
+}
+
+.settings-section-header h2 {
+    margin: 0;
+    color: #f5f8fb;
+    font-size: 16px;
+}
+
+.settings-count {
+    border: 1px solid #2b333d;
+    border-radius: 999px;
+    background: #101418;
+    color: #8ea0b3;
+    font-size: 12px;
+    font-weight: 700;
+    min-width: 28px;
+    padding: 3px 8px;
+    text-align: center;
+}
+
+.protection-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.protection-list-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid #252c34;
+    color: #d6dee6;
+    font-size: 13px;
+    min-height: 48px;
+    padding: 10px 16px;
+}
+
+.protection-list-row:last-child {
+    border-bottom: 0;
 }
 
 .page-empty-state {
@@ -419,7 +658,20 @@ h1 {
         grid-template-columns: 1fr;
     }
 
+    .port-toolbar {
+        grid-template-columns: 1fr;
+    }
+
+    .settings-add-form,
+    .settings-grid {
+        grid-template-columns: 1fr;
+    }
+
     .sort-controls {
         flex-wrap: wrap;
+    }
+
+    .confirmation-details div {
+        grid-template-columns: 1fr;
     }
 }
