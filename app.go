@@ -5,10 +5,12 @@ import (
 	"math"
 	"time"
 
+	processscanner "dev-resource-manager/internal/process"
+
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/net"
-	"github.com/shirou/gopsutil/v3/process"
+	gopsprocess "github.com/shirou/gopsutil/v3/process"
 )
 
 // SystemResourceInfo is the resource snapshot returned to the frontend.
@@ -64,7 +66,7 @@ func (a *App) GetSystemResourceInfo() SystemResourceInfo {
 		info.FreeMemoryBytes = 0
 	}
 
-	if pids, err := process.Pids(); err == nil {
+	if pids, err := gopsprocess.Pids(); err == nil {
 		info.ProcessCount = len(pids)
 	} else {
 		// TODO: surface process collection permission errors to the frontend diagnostics panel.
@@ -89,4 +91,19 @@ func (a *App) GetSystemResourceInfo() SystemResourceInfo {
 
 func roundOneDecimal(value float64) float64 {
 	return math.Round(value*10) / 10
+}
+
+// GetProcessList returns the current Windows process list for the frontend.
+func (a *App) GetProcessList() ([]processscanner.Info, error) {
+	ctx := a.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	processes, err := processscanner.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return processes, nil
 }

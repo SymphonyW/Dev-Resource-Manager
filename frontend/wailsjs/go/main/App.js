@@ -6,6 +6,10 @@ export function AppName() {
   return window['go']['main']['App']['AppName']();
 }
 
+export function GetProcessList() {
+  return window['go']['main']['App']['GetProcessList']();
+}
+
 export function GetSystemResourceInfo() {
   return window['go']['main']['App']['GetSystemResourceInfo']();
 }

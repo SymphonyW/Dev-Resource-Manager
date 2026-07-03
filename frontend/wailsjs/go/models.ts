@@ -25,3 +25,34 @@ export namespace main {
 
 }
 
+export namespace process {
+	
+	export class Info {
+	    pid: number;
+	    name: string;
+	    path: string;
+	    commandLine: string;
+	    user: string;
+	    cpuPercent: number;
+	    memoryBytes: number;
+	    isProtected: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Info(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.pid = source["pid"];
+	        this.name = source["name"];
+	        this.path = source["path"];
+	        this.commandLine = source["commandLine"];
+	        this.user = source["user"];
+	        this.cpuPercent = source["cpuPercent"];
+	        this.memoryBytes = source["memoryBytes"];
+	        this.isProtected = source["isProtected"];
+	    }
+	}
+
+}
+

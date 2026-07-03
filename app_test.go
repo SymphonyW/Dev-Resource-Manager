@@ -20,3 +20,26 @@ func TestGetSystemResourceInfoReturnsResourceSnapshot(t *testing.T) {
 		t.Fatalf("PortCount should not be negative: %d", info.PortCount)
 	}
 }
+
+func TestGetProcessListReturnsCurrentProcesses(t *testing.T) {
+	app := NewApp()
+
+	processes, err := app.GetProcessList()
+	if err != nil {
+		t.Fatalf("expected process list, got error: %v", err)
+	}
+	if len(processes) == 0 {
+		t.Fatalf("expected at least one process")
+	}
+
+	hasNonZeroPID := false
+	for _, process := range processes {
+		if process.PID > 0 {
+			hasNonZeroPID = true
+			break
+		}
+	}
+	if !hasNonZeroPID {
+		t.Fatalf("expected at least one non-zero process pid")
+	}
+}
