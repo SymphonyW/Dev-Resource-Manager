@@ -1,16 +1,18 @@
-import {fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {fireEvent, render, screen, waitFor, within} from '@testing-library/react';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import App from './App';
 
 const getSystemResourceInfoMock = vi.fn();
 const getProcessListMock = vi.fn();
 const getPortListMock = vi.fn();
+const killProcessByPIDMock = vi.fn();
 
 vi.mock('../wailsjs/go/main/App', () => ({
     AppName: () => new Promise(() => {}),
     GetPortList: () => getPortListMock(),
     GetProcessList: () => getProcessListMock(),
     GetSystemResourceInfo: () => getSystemResourceInfoMock(),
+    KillProcessByPID: (pid: number) => killProcessByPIDMock(pid),
 }));
 
 const processRows = [
@@ -96,6 +98,13 @@ describe('App layout navigation', () => {
         getProcessListMock.mockResolvedValue(processRows);
         getPortListMock.mockReset();
         getPortListMock.mockResolvedValue(portRows);
+        killProcessByPIDMock.mockReset();
+        killProcessByPIDMock.mockResolvedValue({
+            success: true,
+            message: 'Process node.exe (PID 100) ended.',
+            pid: 100,
+            processName: 'node.exe',
+        });
     });
 
     it('renders all primary navigation pages and highlights Dashboard by default', async () => {
@@ -158,7 +167,7 @@ describe('App layout navigation', () => {
         expect(screen.getByText('42')).toBeInTheDocument();
     });
 
-    it('loads Processes into a table with protected markers and disabled actions', async () => {
+    it('loads Processes into a table with protected markers and protected actions disabled', async () => {
         render(<App/>);
 
         fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
@@ -167,8 +176,14 @@ describe('App layout navigation', () => {
         expect(await screen.findByText('node.exe')).toBeInTheDocument();
         expect(screen.getByText('System')).toBeInTheDocument();
         expect(screen.getAllByText('Protected').length).toBeGreaterThan(1);
-        expect(screen.getAllByRole('button', {name: 'Terminate'})).toHaveLength(3);
-        expect(screen.getAllByRole('button', {name: 'Terminate'}).every((button) => button.hasAttribute('disabled'))).toBe(true);
+
+        const systemRow = screen.getByText('System').closest('tr');
+        const nodeRow = screen.getByText('node.exe').closest('tr');
+
+        expect(systemRow).not.toBeNull();
+        expect(nodeRow).not.toBeNull();
+        expect(within(systemRow as HTMLTableRowElement).getByRole('button', {name: '结束进程'})).toBeDisabled();
+        expect(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: '结束进程'})).not.toBeDisabled();
     });
 
     it('filters Processes by name and PID', async () => {
@@ -216,6 +231,34 @@ describe('App layout navigation', () => {
 
         fireEvent.click(screen.getByRole('button', {name: 'Refresh Processes'}));
         expect(await screen.findByText('Unable to load process list.')).toBeInTheDocument();
+    });
+
+    it('confirms before ending a process and shows operation result', async () => {
+        getProcessListMock
+            .mockResolvedValueOnce(processRows)
+            .mockResolvedValueOnce(processRows.filter((process) => process.pid !== 100));
+
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+
+        const nodeRow = screen.getByText('node.exe').closest('tr');
+        expect(nodeRow).not.toBeNull();
+        fireEvent.click(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: '结束进程'}));
+
+        const dialog = screen.getByRole('dialog', {name: 'Confirm process termination'});
+        expect(within(dialog).getByText('PID')).toBeInTheDocument();
+        expect(within(dialog).getByText('100')).toBeInTheDocument();
+        expect(within(dialog).getByText('node.exe')).toBeInTheDocument();
+        expect(within(dialog).getByText('C:\\Program Files\\nodejs\\node.exe')).toBeInTheDocument();
+        expect(within(dialog).getByText('512.0 MB')).toBeInTheDocument();
+
+        fireEvent.click(within(dialog).getByRole('button', {name: 'Confirm End Process'}));
+
+        await waitFor(() => expect(killProcessByPIDMock).toHaveBeenCalledWith(100));
+        expect(await screen.findByText('Process node.exe (PID 100) ended.')).toBeInTheDocument();
+        expect(screen.queryByRole('dialog', {name: 'Confirm process termination'})).not.toBeInTheDocument();
     });
 
     it('loads Ports into a table with common dev port markers and disabled actions', async () => {

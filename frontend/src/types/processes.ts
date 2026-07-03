@@ -9,4 +9,11 @@ export interface ProcessInfo {
     isProtected: boolean;
 }
 
+export interface OperationResult {
+    success: boolean;
+    message: string;
+    pid: number;
+    processName: string;
+}
+
 export type ProcessSortKey = 'memory' | 'cpu';

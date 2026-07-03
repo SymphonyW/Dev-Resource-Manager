@@ -11,3 +11,5 @@ export function GetPortList():Promise<Array<port.Info>>;
 export function GetProcessList():Promise<Array<process.Info>>;
 
 export function GetSystemResourceInfo():Promise<main.SystemResourceInfo>;
+
+export function KillProcessByPID(arg1:number):Promise<process.OperationResult>;
