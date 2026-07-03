@@ -25,6 +25,33 @@ export namespace main {
 
 }
 
+export namespace port {
+
+	export class Info {
+	    port: number;
+	    protocol: string;
+	    status: string;
+	    pid: number;
+	    processName: string;
+	    processPath: string;
+
+	    static createFrom(source: any = {}) {
+	        return new Info(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.port = source["port"];
+	        this.protocol = source["protocol"];
+	        this.status = source["status"];
+	        this.pid = source["pid"];
+	        this.processName = source["processName"];
+	        this.processPath = source["processPath"];
+	    }
+	}
+
+}
+
 export namespace process {
 	
 	export class Info {
@@ -55,4 +82,3 @@ export namespace process {
 	}
 
 }
-

@@ -6,6 +6,10 @@ export function AppName() {
   return window['go']['main']['App']['AppName']();
 }
 
+export function GetPortList() {
+  return window['go']['main']['App']['GetPortList']();
+}
+
 export function GetProcessList() {
   return window['go']['main']['App']['GetProcessList']();
 }

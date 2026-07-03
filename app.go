@@ -5,6 +5,7 @@ import (
 	"math"
 	"time"
 
+	portscanner "dev-resource-manager/internal/port"
 	processscanner "dev-resource-manager/internal/process"
 
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -106,4 +107,19 @@ func (a *App) GetProcessList() ([]processscanner.Info, error) {
 	}
 
 	return processes, nil
+}
+
+// GetPortList returns the current Windows TCP/UDP port occupancy list for the frontend.
+func (a *App) GetPortList() ([]portscanner.Info, error) {
+	ctx := a.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	ports, err := portscanner.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return ports, nil
 }
