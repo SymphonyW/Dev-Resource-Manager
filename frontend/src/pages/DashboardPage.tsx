@@ -79,15 +79,7 @@ function DashboardPage({page, t}: DashboardPageProps) {
         : [];
 
     return (
-        <section className="page-panel dashboard-page" aria-labelledby={`${page.id}-title`}>
-            <div className="page-header compact-page-header">
-                <div>
-                    <p className="eyebrow">{page.eyebrow}</p>
-                    <h1 id={`${page.id}-title`}>{page.title}</h1>
-                    <p className="page-description">{page.description}</p>
-                </div>
-            </div>
-
+        <section className="page-panel dashboard-page" aria-label={page.title}>
             {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}
             {isLoading && !resourceInfo && (
                 <StatusMessage variant="loading">{t('dashboard.loading')}</StatusMessage>

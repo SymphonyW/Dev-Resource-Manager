@@ -220,7 +220,9 @@ describe('App layout navigation', () => {
         expect(screen.getByRole('button', {name: 'Cleanup'})).toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'Logs'})).toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'Settings'})).toBeInTheDocument();
-        expect(await screen.findByRole('heading', {name: 'Dashboard'})).toBeInTheDocument();
+        expect(await screen.findByLabelText('CPU usage chart')).toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Dashboard'})).not.toBeInTheDocument();
+        expect(screen.queryByText('System overview')).not.toBeInTheDocument();
     });
 
     it('switches the main content when a navigation item is selected', async () => {
@@ -229,9 +231,28 @@ describe('App layout navigation', () => {
         fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
 
         expect(screen.getByRole('button', {name: 'Ports'})).toHaveAttribute('aria-current', 'page');
-        expect(screen.getByRole('heading', {name: 'Ports'})).toBeInTheDocument();
-        expect(screen.getByText('Review local TCP and UDP ports and the owning process.')).toBeInTheDocument();
         expect(await screen.findByText('node.exe')).toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Ports'})).not.toBeInTheDocument();
+        expect(screen.queryByText('Review local TCP and UDP ports and the owning process.')).not.toBeInTheDocument();
+    });
+
+    it('does not render page title and description headers above app workspaces', async () => {
+        render(<App/>);
+
+        expect(await screen.findByLabelText('CPU usage chart')).toBeInTheDocument();
+        expect(screen.queryByText('System overview')).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Dashboard'})).not.toBeInTheDocument();
+        expect(screen.queryByText('Monitor CPU, memory, GPU, VRAM, processes, and occupied ports in real time.')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+        expect(screen.queryByText('Process monitor')).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Processes'})).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', {name: 'Settings'}));
+        expect(await screen.findByText('redis-server.exe')).toBeInTheDocument();
+        expect(screen.queryByText('Protection settings')).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Settings'})).not.toBeInTheDocument();
     });
 
     it('loads Dashboard resource metrics and refreshes them automatically', async () => {
@@ -345,7 +366,6 @@ describe('App layout navigation', () => {
         render(<App/>);
 
         fireEvent.click(screen.getByRole('button', {name: 'Settings'}));
-        expect(await screen.findByRole('heading', {name: 'Settings'})).toBeInTheDocument();
         expect(await screen.findByText('redis-server.exe')).toBeInTheDocument();
 
         await act(async () => {
@@ -353,7 +373,7 @@ describe('App layout navigation', () => {
         });
 
         expect(screen.getByRole('button', {name: '进程'})).toBeInTheDocument();
-        expect(screen.getByRole('heading', {name: '设置'})).toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: '设置'})).not.toBeInTheDocument();
         expect(screen.getByLabelText('语言')).toHaveValue('zh');
     });
 
@@ -362,7 +382,6 @@ describe('App layout navigation', () => {
 
         fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
 
-        expect(await screen.findByRole('heading', {name: 'Processes'})).toBeInTheDocument();
         expect(await screen.findByText('node.exe')).toBeInTheDocument();
         expect(screen.getByText('System')).toBeInTheDocument();
         expect(screen.getAllByText('Protected').length).toBeGreaterThan(1);
@@ -483,7 +502,6 @@ describe('App layout navigation', () => {
 
         fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
 
-        expect(await screen.findByRole('heading', {name: 'Ports'})).toBeInTheDocument();
         expect(await screen.findByText('node.exe')).toBeInTheDocument();
         expect(screen.getByText('3000')).toBeInTheDocument();
         expect(screen.getByText('5432')).toBeInTheDocument();
@@ -605,8 +623,11 @@ describe('App layout navigation', () => {
 
         fireEvent.click(screen.getByRole('button', {name: 'Cleanup'}));
 
-        expect(await screen.findByRole('heading', {name: 'Cleanup'})).toBeInTheDocument();
         expect(await screen.findByText('node.exe')).toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Cleanup'})).not.toBeInTheDocument();
+        expect(screen.getByRole('toolbar', {name: 'Cleanup actions'})).toHaveClass('cleanup-toolbar');
+        expect(screen.getByText('Candidates')).toBeInTheDocument();
+        expect(screen.getByText('Selected')).toBeInTheDocument();
         expect(screen.getByText('postgres.exe')).toBeInTheDocument();
         expect(screen.getByText('vmmem')).toBeInTheDocument();
         expect(screen.queryByText('chrome.exe')).not.toBeInTheDocument();
@@ -666,7 +687,6 @@ describe('App layout navigation', () => {
 
         fireEvent.click(screen.getByRole('button', {name: 'Settings'}));
 
-        expect(await screen.findByRole('heading', {name: 'Settings'})).toBeInTheDocument();
         expect(await screen.findByText('System')).toBeInTheDocument();
         expect(screen.getByText('svchost.exe')).toBeInTheDocument();
         expect(screen.getByText('redis-server.exe')).toBeInTheDocument();
@@ -716,7 +736,7 @@ describe('App layout navigation', () => {
         fireEvent.click(screen.getByRole('button', {name: 'Logs'}));
 
         await act(async () => {});
-        expect(screen.getByRole('heading', {name: 'Logs'})).toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Logs'})).not.toBeInTheDocument();
         expect(screen.getByText('No operation logs found.')).toBeInTheDocument();
         expect(screen.queryByRole('button', {name: 'Refresh Logs'})).not.toBeInTheDocument();
 
