@@ -50,6 +50,10 @@ export namespace main {
 	    totalMemoryBytes: number;
 	    usedMemoryBytes: number;
 	    freeMemoryBytes: number;
+	    gpuPercent: number;
+	    totalVRAMBytes: number;
+	    usedVRAMBytes: number;
+	    freeVRAMBytes: number;
 	    processCount: number;
 	    portCount: number;
 	
@@ -63,6 +67,10 @@ export namespace main {
 	        this.totalMemoryBytes = source["totalMemoryBytes"];
 	        this.usedMemoryBytes = source["usedMemoryBytes"];
 	        this.freeMemoryBytes = source["freeMemoryBytes"];
+	        this.gpuPercent = source["gpuPercent"];
+	        this.totalVRAMBytes = source["totalVRAMBytes"];
+	        this.usedVRAMBytes = source["usedVRAMBytes"];
+	        this.freeVRAMBytes = source["freeVRAMBytes"];
 	        this.processCount = source["processCount"];
 	        this.portCount = source["portCount"];
 	    }

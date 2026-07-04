@@ -190,7 +190,7 @@ function PortsPage({page, t}: PortsPageProps) {
                                 <th>{t('field.pid')}</th>
                                 <th>{t('field.processName')}</th>
                                 <th>{t('field.processPath')}</th>
-                                <th>{t('field.action')}</th>
+                                <th className="sticky-action-column">{t('field.action')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -210,7 +210,7 @@ function PortsPage({page, t}: PortsPageProps) {
                                         <td className="muted-cell compact-path-cell" title={port.processPath || t('common.unavailable')}>
                                             {port.processPath || t('common.unavailable')}
                                         </td>
-                                        <td>
+                                        <td className="sticky-action-column">
                                             <button
                                                 aria-label={t('terminate.occupancy')}
                                                 className="danger-button table-action-button"

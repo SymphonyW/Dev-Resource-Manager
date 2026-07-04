@@ -184,7 +184,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                 <th>{t('field.memory')}</th>
                                 <th>{t('field.user')}</th>
                                 <th>{t('field.protected')}</th>
-                                <th>{t('field.action')}</th>
+                                <th className="sticky-action-column">{t('field.action')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -213,7 +213,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                                 {process.isProtected ? t('badge.protected') : t('badge.standard')}
                                             </span>
                                         </td>
-                                        <td>
+                                        <td className="sticky-action-column">
                                             <button
                                                 className="danger-button table-action-button"
                                                 type="button"

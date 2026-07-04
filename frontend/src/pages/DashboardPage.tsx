@@ -16,6 +16,8 @@ interface DashboardPageProps {
 interface ResourceHistoryPoint {
     cpuPercent: number;
     memoryPercent: number;
+    gpuPercent: number;
+    vramPercent: number;
 }
 
 function DashboardPage({page, t}: DashboardPageProps) {
@@ -36,6 +38,8 @@ function DashboardPage({page, t}: DashboardPageProps) {
             const nextPoint = {
                 cpuPercent: clampPercent(nextResourceInfo.cpuPercent),
                 memoryPercent: getMemoryUsagePercent(nextResourceInfo),
+                gpuPercent: clampPercent(nextResourceInfo.gpuPercent),
+                vramPercent: getVRAMUsagePercent(nextResourceInfo),
             };
 
             setResourceInfo(nextResourceInfo);
@@ -66,12 +70,9 @@ function DashboardPage({page, t}: DashboardPageProps) {
     }, [loadResources]);
 
     const memoryPercent = resourceInfo ? getMemoryUsagePercent(resourceInfo) : 0;
+    const vramPercent = resourceInfo ? getVRAMUsagePercent(resourceInfo) : 0;
     const metrics = resourceInfo
         ? [
-            {label: t('dashboard.metric.cpu'), value: formatPercent(resourceInfo.cpuPercent)},
-            {label: t('dashboard.metric.totalMemory'), value: formatMemorySize(resourceInfo.totalMemoryBytes)},
-            {label: t('dashboard.metric.usedMemory'), value: formatMemorySize(resourceInfo.usedMemoryBytes)},
-            {label: t('dashboard.metric.freeMemory'), value: formatMemorySize(resourceInfo.freeMemoryBytes)},
             {label: t('dashboard.metric.processes'), value: resourceInfo.processCount.toString()},
             {label: t('dashboard.metric.occupiedPorts'), value: resourceInfo.portCount.toString()},
         ]
@@ -112,6 +113,26 @@ function DashboardPage({page, t}: DashboardPageProps) {
                             value={formatPercent(memoryPercent)}
                             history={resourceHistory}
                             historyKey="memoryPercent"
+                            t={t}
+                        />
+
+                        <ResourceGraph
+                            ariaLabel={t('dashboard.chart.gpuAria')}
+                            title={t('dashboard.chart.gpu')}
+                            subtitle={t('dashboard.autoRefresh')}
+                            value={formatPercent(resourceInfo.gpuPercent)}
+                            history={resourceHistory}
+                            historyKey="gpuPercent"
+                            t={t}
+                        />
+
+                        <ResourceGraph
+                            ariaLabel={t('dashboard.chart.vramAria')}
+                            title={t('dashboard.chart.vram')}
+                            subtitle={`${formatMemorySize(resourceInfo.usedVRAMBytes)} / ${formatMemorySize(resourceInfo.totalVRAMBytes)}`}
+                            value={formatPercent(vramPercent)}
+                            history={resourceHistory}
+                            historyKey="vramPercent"
                             t={t}
                         />
                     </div>
@@ -184,6 +205,14 @@ function getMemoryUsagePercent(resourceInfo: SystemResourceInfo): number {
     }
 
     return clampPercent((resourceInfo.usedMemoryBytes / resourceInfo.totalMemoryBytes) * 100);
+}
+
+function getVRAMUsagePercent(resourceInfo: SystemResourceInfo): number {
+    if (resourceInfo.totalVRAMBytes <= 0) {
+        return 0;
+    }
+
+    return clampPercent((resourceInfo.usedVRAMBytes / resourceInfo.totalVRAMBytes) * 100);
 }
 
 function clampPercent(value: number): number {

@@ -168,6 +168,10 @@ describe('App layout navigation', () => {
             totalMemoryBytes: 16 * 1024 * 1024 * 1024,
             usedMemoryBytes: 9.5 * 1024 * 1024 * 1024,
             freeMemoryBytes: 6.5 * 1024 * 1024 * 1024,
+            gpuPercent: 18.2,
+            totalVRAMBytes: 8 * 1024 * 1024 * 1024,
+            usedVRAMBytes: 3 * 1024 * 1024 * 1024,
+            freeVRAMBytes: 5 * 1024 * 1024 * 1024,
             processCount: 184,
             portCount: 37,
         });
@@ -238,6 +242,10 @@ describe('App layout navigation', () => {
                 totalMemoryBytes: 16 * 1024 * 1024 * 1024,
                 usedMemoryBytes: 9.5 * 1024 * 1024 * 1024,
                 freeMemoryBytes: 6.5 * 1024 * 1024 * 1024,
+                gpuPercent: 18.2,
+                totalVRAMBytes: 8 * 1024 * 1024 * 1024,
+                usedVRAMBytes: 3 * 1024 * 1024 * 1024,
+                freeVRAMBytes: 5 * 1024 * 1024 * 1024,
                 processCount: 184,
                 portCount: 37,
             })
@@ -246,6 +254,10 @@ describe('App layout navigation', () => {
                 totalMemoryBytes: 16 * 1024 * 1024 * 1024,
                 usedMemoryBytes: 8 * 1024 * 1024 * 1024,
                 freeMemoryBytes: 7.5 * 1024 * 1024 * 1024,
+                gpuPercent: 28.4,
+                totalVRAMBytes: 8 * 1024 * 1024 * 1024,
+                usedVRAMBytes: 4 * 1024 * 1024 * 1024,
+                freeVRAMBytes: 4 * 1024 * 1024 * 1024,
                 processCount: 190,
                 portCount: 42,
             });
@@ -255,9 +267,13 @@ describe('App layout navigation', () => {
         await act(async () => {});
 
         expect(screen.getAllByText('42.5%').length).toBeGreaterThan(0);
-        expect(screen.getAllByText('16.0 GB').length).toBeGreaterThan(0);
-        expect(screen.getAllByText('9.5 GB').length).toBeGreaterThan(0);
-        expect(screen.getByText('6.5 GB')).toBeInTheDocument();
+        expect(screen.getByText('9.5 GB / 16.0 GB')).toBeInTheDocument();
+        expect(screen.queryByText('Total Memory')).not.toBeInTheDocument();
+        expect(screen.queryByText('Used Memory')).not.toBeInTheDocument();
+        expect(screen.queryByText('Free Memory')).not.toBeInTheDocument();
+        expect(screen.getByText('GPU')).toBeInTheDocument();
+        expect(screen.getByText('VRAM')).toBeInTheDocument();
+        expect(screen.getByText('3.0 GB / 8.0 GB')).toBeInTheDocument();
         expect(screen.getByText('184')).toBeInTheDocument();
         expect(screen.getByText('37')).toBeInTheDocument();
 
@@ -270,7 +286,8 @@ describe('App layout navigation', () => {
 
         expect(getSystemResourceInfoMock).toHaveBeenCalledTimes(2);
         expect(screen.getAllByText('25.0%').length).toBeGreaterThan(0);
-        expect(screen.getAllByText('8.0 GB').length).toBeGreaterThan(0);
+        expect(screen.getByText('8.0 GB / 16.0 GB')).toBeInTheDocument();
+        expect(screen.getByText('4.0 GB / 8.0 GB')).toBeInTheDocument();
         expect(screen.getByText('190')).toBeInTheDocument();
         expect(screen.getByText('42')).toBeInTheDocument();
     });
@@ -283,6 +300,10 @@ describe('App layout navigation', () => {
                 totalMemoryBytes: 16 * 1024 * 1024 * 1024,
                 usedMemoryBytes: 9.5 * 1024 * 1024 * 1024,
                 freeMemoryBytes: 6.5 * 1024 * 1024 * 1024,
+                gpuPercent: 18.2,
+                totalVRAMBytes: 8 * 1024 * 1024 * 1024,
+                usedVRAMBytes: 3 * 1024 * 1024 * 1024,
+                freeVRAMBytes: 5 * 1024 * 1024 * 1024,
                 processCount: 184,
                 portCount: 37,
             })
@@ -291,6 +312,10 @@ describe('App layout navigation', () => {
                 totalMemoryBytes: 16 * 1024 * 1024 * 1024,
                 usedMemoryBytes: 8 * 1024 * 1024 * 1024,
                 freeMemoryBytes: 8 * 1024 * 1024 * 1024,
+                gpuPercent: 28.4,
+                totalVRAMBytes: 8 * 1024 * 1024 * 1024,
+                usedVRAMBytes: 4 * 1024 * 1024 * 1024,
+                freeVRAMBytes: 4 * 1024 * 1024 * 1024,
                 processCount: 190,
                 portCount: 42,
             });
@@ -302,6 +327,8 @@ describe('App layout navigation', () => {
         expect(screen.getAllByText('42.5%').length).toBeGreaterThan(0);
         expect(screen.getByLabelText('CPU usage chart')).toBeInTheDocument();
         expect(screen.getByLabelText('Memory usage chart')).toBeInTheDocument();
+        expect(screen.getByLabelText('GPU usage chart')).toBeInTheDocument();
+        expect(screen.getByLabelText('VRAM usage chart')).toBeInTheDocument();
 
         await act(async () => {
             vi.advanceTimersByTime(5000);
@@ -310,7 +337,8 @@ describe('App layout navigation', () => {
 
         expect(getSystemResourceInfoMock).toHaveBeenCalledTimes(2);
         expect(screen.getAllByText('25.0%').length).toBeGreaterThan(0);
-        expect(screen.getByText('50.0%')).toBeInTheDocument();
+        expect(screen.getAllByText('50.0%').length).toBeGreaterThanOrEqual(2);
+        expect(screen.getByText('28.4%')).toBeInTheDocument();
     });
 
     it('switches application language from Settings', async () => {
@@ -344,8 +372,13 @@ describe('App layout navigation', () => {
 
         expect(systemRow).not.toBeNull();
         expect(nodeRow).not.toBeNull();
-        expect(within(systemRow as HTMLTableRowElement).getByRole('button', {name: 'End Process'})).toBeDisabled();
-        expect(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End Process'})).not.toBeDisabled();
+        const systemAction = within(systemRow as HTMLTableRowElement).getByRole('button', {name: 'End Process'});
+        const nodeAction = within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End Process'});
+
+        expect(systemAction.closest('td')).toHaveClass('sticky-action-column');
+        expect(nodeAction.closest('td')).toHaveClass('sticky-action-column');
+        expect(systemAction).toBeDisabled();
+        expect(nodeAction).not.toBeDisabled();
     });
 
     it('keeps long process commands visually constrained while preserving full command text', async () => {
@@ -461,8 +494,13 @@ describe('App layout navigation', () => {
 
         expect(nodeRow).not.toBeNull();
         expect(protectedRow).not.toBeNull();
-        expect(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End Occupancy'})).not.toBeDisabled();
-        expect(within(protectedRow as HTMLTableRowElement).getByRole('button', {name: 'End Occupancy'})).toBeDisabled();
+        const nodeAction = within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End Occupancy'});
+        const protectedAction = within(protectedRow as HTMLTableRowElement).getByRole('button', {name: 'End Occupancy'});
+
+        expect(nodeAction.closest('td')).toHaveClass('sticky-action-column');
+        expect(protectedAction.closest('td')).toHaveClass('sticky-action-column');
+        expect(nodeAction).not.toBeDisabled();
+        expect(protectedAction).toBeDisabled();
     });
 
     it('confirms before ending a port occupant and refreshes the port list', async () => {

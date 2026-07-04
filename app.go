@@ -10,6 +10,7 @@ import (
 	"dev-resource-manager/internal/config"
 	portscanner "dev-resource-manager/internal/port"
 	processscanner "dev-resource-manager/internal/process"
+	"dev-resource-manager/internal/resource"
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
@@ -23,6 +24,10 @@ type SystemResourceInfo struct {
 	TotalMemoryBytes uint64  `json:"totalMemoryBytes"`
 	UsedMemoryBytes  uint64  `json:"usedMemoryBytes"`
 	FreeMemoryBytes  uint64  `json:"freeMemoryBytes"`
+	GPUPercent       float64 `json:"gpuPercent"`
+	TotalVRAMBytes   uint64  `json:"totalVRAMBytes"`
+	UsedVRAMBytes    uint64  `json:"usedVRAMBytes"`
+	FreeVRAMBytes    uint64  `json:"freeVRAMBytes"`
 	ProcessCount     int     `json:"processCount"`
 	PortCount        int     `json:"portCount"`
 }
@@ -69,6 +74,12 @@ func (a *App) GetSystemResourceInfo() SystemResourceInfo {
 		info.UsedMemoryBytes = 0
 		info.FreeMemoryBytes = 0
 	}
+
+	gpuInfo := resource.GetGPUInfo()
+	info.GPUPercent = gpuInfo.GPUPercent
+	info.TotalVRAMBytes = gpuInfo.TotalVRAMBytes
+	info.UsedVRAMBytes = gpuInfo.UsedVRAMBytes
+	info.FreeVRAMBytes = gpuInfo.FreeVRAMBytes
 
 	if pids, err := gopsprocess.Pids(); err == nil {
 		info.ProcessCount = len(pids)
