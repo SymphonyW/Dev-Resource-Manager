@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"math"
+	"strings"
 	"time"
 
+	"dev-resource-manager/internal/config"
 	portscanner "dev-resource-manager/internal/port"
 	processscanner "dev-resource-manager/internal/process"
+	"dev-resource-manager/internal/resource"
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
@@ -20,6 +24,10 @@ type SystemResourceInfo struct {
 	TotalMemoryBytes uint64  `json:"totalMemoryBytes"`
 	UsedMemoryBytes  uint64  `json:"usedMemoryBytes"`
 	FreeMemoryBytes  uint64  `json:"freeMemoryBytes"`
+	GPUPercent       float64 `json:"gpuPercent"`
+	TotalVRAMBytes   uint64  `json:"totalVRAMBytes"`
+	UsedVRAMBytes    uint64  `json:"usedVRAMBytes"`
+	FreeVRAMBytes    uint64  `json:"freeVRAMBytes"`
 	ProcessCount     int     `json:"processCount"`
 	PortCount        int     `json:"portCount"`
 }
@@ -67,6 +75,12 @@ func (a *App) GetSystemResourceInfo() SystemResourceInfo {
 		info.FreeMemoryBytes = 0
 	}
 
+	gpuInfo := resource.GetGPUInfo()
+	info.GPUPercent = gpuInfo.GPUPercent
+	info.TotalVRAMBytes = gpuInfo.TotalVRAMBytes
+	info.UsedVRAMBytes = gpuInfo.UsedVRAMBytes
+	info.FreeVRAMBytes = gpuInfo.FreeVRAMBytes
+
 	if pids, err := gopsprocess.Pids(); err == nil {
 		info.ProcessCount = len(pids)
 	} else {
@@ -96,12 +110,13 @@ func roundOneDecimal(value float64) float64 {
 
 // GetProcessList returns the current Windows process list for the frontend.
 func (a *App) GetProcessList() ([]processscanner.Info, error) {
-	ctx := a.ctx
-	if ctx == nil {
-		ctx = context.Background()
+	ctx := a.appContext()
+	rules, err := a.loadProtectionRules(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	processes, err := processscanner.List(ctx)
+	processes, err := processscanner.ListWithProtector(ctx, rules)
 	if err != nil {
 		return nil, err
 	}
@@ -111,15 +126,159 @@ func (a *App) GetProcessList() ([]processscanner.Info, error) {
 
 // GetPortList returns the current Windows TCP/UDP port occupancy list for the frontend.
 func (a *App) GetPortList() ([]portscanner.Info, error) {
-	ctx := a.ctx
-	if ctx == nil {
-		ctx = context.Background()
+	ctx := a.appContext()
+	rules, err := a.loadProtectionRules(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	ports, err := portscanner.List(ctx)
+	ports, err := portscanner.ListWithProtector(ctx, rules)
 	if err != nil {
 		return nil, err
 	}
 
 	return ports, nil
+}
+
+// KillProcessByPID ends a non-protected process by PID and returns an operation result.
+func (a *App) KillProcessByPID(pid int) processscanner.OperationResult {
+	ctx := a.appContext()
+	rules, err := a.loadProtectionRules(ctx)
+	if err != nil {
+		result := processscanner.OperationResult{
+			Success: false,
+			Message: "Unable to load process protection rules before ending process: " + err.Error(),
+			PID:     pid,
+		}
+		return a.recordOperationLog(ctx, "kill_process_by_pid", 0, result)
+	}
+
+	result := processscanner.KillByPIDWithProtector(ctx, pid, rules)
+	return a.recordOperationLog(ctx, "kill_process_by_pid", 0, result)
+}
+
+// KillProcessByPort resolves a port owner and ends the owning process if it is allowed.
+func (a *App) KillProcessByPort(port int, protocol string) processscanner.OperationResult {
+	ctx := a.appContext()
+	rules, err := a.loadProtectionRules(ctx)
+	if err != nil {
+		result := processscanner.OperationResult{
+			Success: false,
+			Message: "Unable to load process protection rules before ending port occupancy: " + err.Error(),
+		}
+		return a.recordOperationLog(ctx, "kill_process_by_port", port, result)
+	}
+
+	result := portscanner.KillProcessByPortWithProtector(ctx, port, protocol, rules)
+	return a.recordOperationLog(ctx, "kill_process_by_port", port, result)
+}
+
+// GetProtectionSettings returns the built-in and user-managed protected process names.
+func (a *App) GetProtectionSettings() (config.ProtectionSettings, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return config.ProtectionSettings{}, err
+	}
+	defer store.Close()
+
+	return store.GetProtectionSettings(a.appContext())
+}
+
+// AddCustomProtectedProcessName adds a user-managed protected process name.
+func (a *App) AddCustomProtectedProcessName(name string) (config.ProtectionSettings, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return config.ProtectionSettings{}, err
+	}
+	defer store.Close()
+
+	return store.AddCustomProtectedProcessName(a.appContext(), name)
+}
+
+// DeleteCustomProtectedProcessName removes a user-managed protected process name.
+func (a *App) DeleteCustomProtectedProcessName(name string) (config.ProtectionSettings, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return config.ProtectionSettings{}, err
+	}
+	defer store.Close()
+
+	return store.DeleteCustomProtectedProcessName(a.appContext(), name)
+}
+
+// GetOperationLogs returns persisted process operation logs ordered newest first.
+func (a *App) GetOperationLogs() ([]config.OperationLog, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return nil, err
+	}
+	defer store.Close()
+
+	return store.GetOperationLogs(a.appContext())
+}
+
+func (a *App) appContext() context.Context {
+	if a.ctx == nil {
+		return context.Background()
+	}
+
+	return a.ctx
+}
+
+func (a *App) loadProtectionRules(ctx context.Context) (config.ProtectionRules, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return config.ProtectionRules{}, err
+	}
+	defer store.Close()
+
+	rules, err := store.LoadProtectionRules(ctx)
+	if err != nil {
+		return config.ProtectionRules{}, err
+	}
+
+	return rules, nil
+}
+
+func (a *App) recordOperationLog(ctx context.Context, action string, port int, result processscanner.OperationResult) processscanner.OperationResult {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return appendOperationLogError(result, err)
+	}
+	defer store.Close()
+
+	logResult := "failure"
+	if result.Success {
+		logResult = "success"
+	}
+
+	err = store.AddOperationLog(ctx, config.OperationLogInput{
+		Action:      action,
+		PID:         result.PID,
+		ProcessName: result.ProcessName,
+		Port:        port,
+		Result:      logResult,
+		Message:     result.Message,
+	})
+	if err != nil {
+		return appendOperationLogError(result, err)
+	}
+
+	return result
+}
+
+func appendOperationLogError(result processscanner.OperationResult, err error) processscanner.OperationResult {
+	if err == nil {
+		return result
+	}
+
+	baseMessage := strings.TrimSpace(result.Message)
+	logMessage := fmt.Sprintf("Operation log write failed: %v", err)
+	if baseMessage == "" {
+		result.Message = logMessage
+		return result
+	}
+
+	result.Message = baseMessage + " " + logMessage
+	return result
 }

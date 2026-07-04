@@ -1,23 +1,33 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
-import {isCommonDevelopmentPort, loadPortList} from '../services/ports';
+import StatusMessage from '../components/StatusMessage';
+import {isCommonDevelopmentPort, killProcessByPort, loadPortList} from '../services/ports';
+import type {Translator} from '../services/i18n';
 import type {PageDefinition} from '../types/navigation';
 import type {PortInfo, PortProtocolFilter} from '../types/ports';
 
+const portRefreshIntervalMs = 5000;
+
 interface PortsPageProps {
     page: PageDefinition;
+    t: Translator;
 }
 
-function PortsPage({page}: PortsPageProps) {
+function PortsPage({page, t}: PortsPageProps) {
     const [ports, setPorts] = useState<PortInfo[]>([]);
     const [portSearch, setPortSearch] = useState('');
     const [processSearch, setProcessSearch] = useState('');
     const [protocolFilter, setProtocolFilter] = useState<PortProtocolFilter>('all');
     const [statusFilter, setStatusFilter] = useState('all');
     const [isLoading, setIsLoading] = useState(false);
+    const [isKilling, setIsKilling] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    const [operationMessage, setOperationMessage] = useState('');
+    const [portToKill, setPortToKill] = useState<PortInfo | null>(null);
 
-    const loadPorts = useCallback(async () => {
-        setIsLoading(true);
+    const loadPorts = useCallback(async (showLoading = true) => {
+        if (showLoading) {
+            setIsLoading(true);
+        }
         setErrorMessage('');
 
         try {
@@ -25,15 +35,56 @@ function PortsPage({page}: PortsPageProps) {
             setPorts(nextPorts);
         } catch {
             setPorts([]);
-            setErrorMessage('Unable to load port list.');
+            setErrorMessage(t('ports.error'));
         } finally {
-            setIsLoading(false);
+            if (showLoading) {
+                setIsLoading(false);
+            }
         }
-    }, []);
+    }, [t]);
 
     useEffect(() => {
-        void loadPorts();
+        void loadPorts(true);
+        const intervalId = window.setInterval(() => {
+            void loadPorts(false);
+        }, portRefreshIntervalMs);
+
+        return () => window.clearInterval(intervalId);
     }, [loadPorts]);
+
+    const openKillConfirmation = (port: PortInfo) => {
+        setOperationMessage('');
+        setPortToKill(port);
+    };
+
+    const closeKillConfirmation = () => {
+        if (!isKilling) {
+            setPortToKill(null);
+        }
+    };
+
+    const confirmKillPortOccupant = async () => {
+        if (!portToKill) {
+            return;
+        }
+
+        setIsKilling(true);
+        setErrorMessage('');
+
+        try {
+            const result = await killProcessByPort(portToKill.port, portToKill.protocol);
+            setOperationMessage(result.message);
+            setPortToKill(null);
+
+            if (result.success) {
+                await loadPorts(false);
+            }
+        } catch {
+            setOperationMessage(t('processes.killError'));
+        } finally {
+            setIsKilling(false);
+        }
+    };
 
     const statusOptions = useMemo(() => {
         return Array.from(new Set(ports.map((port) => port.status).filter(Boolean))).sort();
@@ -59,32 +110,15 @@ function PortsPage({page}: PortsPageProps) {
         || processSearch.trim() !== ''
         || protocolFilter !== 'all'
         || statusFilter !== 'all';
-    const emptyMessage = isFiltered ? 'No ports match the current filters.' : 'No ports found.';
+    const emptyMessage = isFiltered ? t('ports.emptyFiltered') : t('ports.empty');
 
     return (
-        <section className="page-panel process-page" aria-labelledby={`${page.id}-title`}>
-            <div className="page-header">
-                <div>
-                    <p className="eyebrow">Port monitor</p>
-                    <h1 id={`${page.id}-title`}>{page.title}</h1>
-                    <p className="page-description">{page.description}</p>
-                </div>
-                <button
-                    aria-label="Refresh Ports"
-                    className="refresh-button"
-                    type="button"
-                    onClick={loadPorts}
-                    disabled={isLoading}
-                >
-                    Refresh
-                </button>
-            </div>
-
-            <div className="port-toolbar">
-                <label className="filter-field">
-                    <span>Search by port number</span>
+        <section className="page-panel process-page" aria-label={page.title}>
+            <div className="port-toolbar compact-toolbar">
+                <label className="filter-field compact-filter">
+                    <span>{t('filter.port')}</span>
                     <input
-                        aria-label="Search by port number"
+                        aria-label={t('filter.port')}
                         inputMode="numeric"
                         value={portSearch}
                         onChange={(event) => setPortSearch(event.target.value)}
@@ -92,34 +126,34 @@ function PortsPage({page}: PortsPageProps) {
                     />
                 </label>
                 <label className="filter-field">
-                    <span>Search by process name</span>
+                    <span>{t('filter.processName')}</span>
                     <input
-                        aria-label="Search by process name"
+                        aria-label={t('filter.processName')}
                         value={processSearch}
                         onChange={(event) => setProcessSearch(event.target.value)}
                         placeholder="node.exe"
                     />
                 </label>
-                <label className="filter-field">
-                    <span>Filter by protocol</span>
+                <label className="filter-field compact-filter">
+                    <span>{t('filter.protocol')}</span>
                     <select
-                        aria-label="Filter by protocol"
+                        aria-label={t('filter.protocol')}
                         value={protocolFilter}
                         onChange={(event) => setProtocolFilter(event.target.value as PortProtocolFilter)}
                     >
-                        <option value="all">All protocols</option>
+                        <option value="all">{t('common.allProtocols')}</option>
                         <option value="TCP">TCP</option>
                         <option value="UDP">UDP</option>
                     </select>
                 </label>
-                <label className="filter-field">
-                    <span>Filter by status</span>
+                <label className="filter-field compact-filter">
+                    <span>{t('filter.status')}</span>
                     <select
-                        aria-label="Filter by status"
+                        aria-label={t('filter.status')}
                         value={statusFilter}
                         onChange={(event) => setStatusFilter(event.target.value)}
                     >
-                        <option value="all">All statuses</option>
+                        <option value="all">{t('common.allStatuses')}</option>
                         {statusOptions.map((status) => (
                             <option key={status} value={status}>{status}</option>
                         ))}
@@ -127,25 +161,28 @@ function PortsPage({page}: PortsPageProps) {
                 </label>
             </div>
 
-            {errorMessage && <p className="resource-error">{errorMessage}</p>}
-            {isLoading && ports.length === 0 && <p className="resource-loading">Loading port list...</p>}
+            {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}
+            {operationMessage && <StatusMessage variant="success">{operationMessage}</StatusMessage>}
+            {isLoading && ports.length === 0 && (
+                <StatusMessage variant="loading">{t('ports.loading')}</StatusMessage>
+            )}
 
             {!isLoading && !errorMessage && visiblePorts.length === 0 && (
-                <p className="process-empty">{emptyMessage}</p>
+                <StatusMessage variant="empty">{emptyMessage}</StatusMessage>
             )}
 
             {visiblePorts.length > 0 && (
-                <div className="process-table-wrap">
-                    <table className="process-table port-table" aria-label="Port list">
+                <div className="process-table-wrap compact-table-wrap">
+                    <table className="process-table port-table compact-data-table" aria-label={t('table.portList')}>
                         <thead>
                             <tr>
-                                <th>Port</th>
-                                <th>Protocol</th>
-                                <th>Status</th>
-                                <th>PID</th>
-                                <th>Process Name</th>
-                                <th>Process Path</th>
-                                <th>Action</th>
+                                <th>{t('field.port')}</th>
+                                <th>{t('field.protocol')}</th>
+                                <th>{t('field.status')}</th>
+                                <th>{t('field.pid')}</th>
+                                <th>{t('field.processName')}</th>
+                                <th>{t('field.processPath')}</th>
+                                <th className="sticky-action-column">{t('field.action')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -156,21 +193,24 @@ function PortsPage({page}: PortsPageProps) {
                                     <tr key={`${port.protocol}-${port.port}-${port.pid}-${port.status}`} className={isDevPort ? 'dev-port-row' : undefined}>
                                         <td>
                                             <span className="mono">{port.port}</span>
-                                            {isDevPort && <span className="dev-port-badge">Dev port</span>}
+                                            {isDevPort && <span className="dev-port-badge">{t('badge.devPort')}</span>}
                                         </td>
-                                        <td><span className="protocol-badge">{port.protocol || 'Unknown'}</span></td>
-                                        <td className="mono">{port.status || 'Unknown'}</td>
+                                        <td><span className="protocol-badge">{port.protocol || t('common.unknown')}</span></td>
+                                        <td className="mono">{port.status || t('common.unknown')}</td>
                                         <td className="mono">{port.pid}</td>
-                                        <td data-testid="port-process-name">{port.processName || 'Unknown'}</td>
-                                        <td className="muted-cell">{port.processPath || 'Unavailable'}</td>
-                                        <td>
+                                        <td data-testid="port-process-name">{port.processName || t('common.unknown')}</td>
+                                        <td className="muted-cell compact-path-cell" title={port.processPath || t('common.unavailable')}>
+                                            {port.processPath || t('common.unavailable')}
+                                        </td>
+                                        <td className="sticky-action-column">
                                             <button
-                                                aria-label="Terminate process"
-                                                className="terminate-button"
+                                                aria-label={t('terminate.occupancy')}
+                                                className="danger-button table-action-button"
                                                 type="button"
-                                                disabled
+                                                disabled={port.isProtected || isKilling}
+                                                onClick={() => openKillConfirmation(port)}
                                             >
-                                                Terminate
+                                                {t('terminate.occupancy')}
                                             </button>
                                         </td>
                                     </tr>
@@ -178,6 +218,69 @@ function PortsPage({page}: PortsPageProps) {
                             })}
                         </tbody>
                     </table>
+                </div>
+            )}
+
+            {portToKill && (
+                <div className="modal-backdrop" role="presentation">
+                    <section
+                        aria-labelledby="kill-port-dialog-title"
+                        className="confirmation-dialog"
+                        role="dialog"
+                    >
+                        <div className="dialog-header">
+                            <h2 id="kill-port-dialog-title">{t('dialog.port.title')}</h2>
+                            <button
+                                aria-label={t('common.close')}
+                                className="dialog-close-button"
+                                type="button"
+                                onClick={closeKillConfirmation}
+                                disabled={isKilling}
+                            >
+                                {t('common.close')}
+                            </button>
+                        </div>
+                        <dl className="confirmation-details">
+                            <div>
+                                <dt>{t('field.port')}</dt>
+                                <dd className="mono">{portToKill.port}</dd>
+                            </div>
+                            <div>
+                                <dt>{t('field.protocol')}</dt>
+                                <dd>{portToKill.protocol || t('common.unknown')}</dd>
+                            </div>
+                            <div>
+                                <dt>{t('field.pid')}</dt>
+                                <dd className="mono">{portToKill.pid}</dd>
+                            </div>
+                            <div>
+                                <dt>{t('field.processName')}</dt>
+                                <dd>{portToKill.processName || t('common.unknown')}</dd>
+                            </div>
+                            <div>
+                                <dt>{t('field.path')}</dt>
+                                <dd>{portToKill.processPath || t('common.unavailable')}</dd>
+                            </div>
+                        </dl>
+                        <div className="dialog-actions">
+                            <button
+                                className="sort-button"
+                                type="button"
+                                onClick={closeKillConfirmation}
+                                disabled={isKilling}
+                            >
+                                {t('common.cancel')}
+                            </button>
+                            <button
+                                className="danger-button"
+                                type="button"
+                                onClick={confirmKillPortOccupant}
+                                disabled={isKilling}
+                            >
+                                {t('dialog.action.confirmEndOccupancy')}
+                            </button>
+                        </div>
+                    </section>
                 </div>
             )}
         </section>

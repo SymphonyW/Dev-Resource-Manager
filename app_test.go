@@ -7,7 +7,7 @@ import (
 )
 
 func TestGetSystemResourceInfoReturnsResourceSnapshot(t *testing.T) {
-	app := NewApp()
+	app := newTestApp(t)
 
 	info := app.GetSystemResourceInfo()
 
@@ -26,7 +26,7 @@ func TestGetSystemResourceInfoReturnsResourceSnapshot(t *testing.T) {
 }
 
 func TestGetProcessListReturnsCurrentProcesses(t *testing.T) {
-	app := NewApp()
+	app := newTestApp(t)
 
 	processes, err := app.GetProcessList()
 	if err != nil {
@@ -52,7 +52,7 @@ func TestGetPortListReturnsCurrentTCPListener(t *testing.T) {
 	listener, port := listenOnLocalTCPPortForAppTest(t)
 	defer listener.Close()
 
-	app := NewApp()
+	app := newTestApp(t)
 	deadline := time.Now().Add(3 * time.Second)
 
 	for {
@@ -73,6 +73,108 @@ func TestGetPortListReturnsCurrentTCPListener(t *testing.T) {
 
 		time.Sleep(100 * time.Millisecond)
 	}
+}
+
+func TestKillProcessByPIDReturnsFailureForInvalidPID(t *testing.T) {
+	app := newTestApp(t)
+
+	result := app.KillProcessByPID(-1)
+
+	if result.Success {
+		t.Fatalf("expected invalid pid kill to fail")
+	}
+	if result.PID != -1 {
+		t.Fatalf("expected pid -1, got %d", result.PID)
+	}
+	if result.Message == "" {
+		t.Fatalf("expected failure message")
+	}
+
+	logs, err := app.GetOperationLogs()
+	if err != nil {
+		t.Fatalf("get operation logs: %v", err)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("expected one operation log, got %d", len(logs))
+	}
+	if logs[0].Action != "kill_process_by_pid" || logs[0].PID != -1 || logs[0].Result != "failure" {
+		t.Fatalf("unexpected operation log: %+v", logs[0])
+	}
+	if logs[0].Message == "" {
+		t.Fatalf("expected operation log message")
+	}
+}
+
+func TestKillProcessByPortLogsFailureForUnsupportedProtocol(t *testing.T) {
+	app := newTestApp(t)
+
+	result := app.KillProcessByPort(3000, "ICMP")
+
+	if result.Success {
+		t.Fatalf("expected unsupported protocol kill to fail")
+	}
+
+	logs, err := app.GetOperationLogs()
+	if err != nil {
+		t.Fatalf("get operation logs: %v", err)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("expected one operation log, got %d", len(logs))
+	}
+	if logs[0].Action != "kill_process_by_port" || logs[0].Port != 3000 || logs[0].Result != "failure" {
+		t.Fatalf("unexpected operation log: %+v", logs[0])
+	}
+}
+
+func TestProtectionSettingsManageCustomProtectedProcesses(t *testing.T) {
+	app := newTestApp(t)
+
+	settings, err := app.GetProtectionSettings()
+	if err != nil {
+		t.Fatalf("get protection settings: %v", err)
+	}
+	if len(settings.DefaultProcessNames) == 0 {
+		t.Fatalf("expected default protected processes")
+	}
+	if len(settings.CustomProcessNames) != 0 {
+		t.Fatalf("expected no custom protected processes, got %v", settings.CustomProcessNames)
+	}
+
+	settings, err = app.AddCustomProtectedProcessName("worker.exe")
+	if err != nil {
+		t.Fatalf("add custom protected process: %v", err)
+	}
+	if !containsAppTestString(settings.CustomProcessNames, "worker.exe") {
+		t.Fatalf("expected worker.exe in custom protected processes, got %v", settings.CustomProcessNames)
+	}
+
+	settings, err = app.DeleteCustomProtectedProcessName("WORKER.EXE")
+	if err != nil {
+		t.Fatalf("delete custom protected process: %v", err)
+	}
+	if containsAppTestString(settings.CustomProcessNames, "worker.exe") {
+		t.Fatalf("expected worker.exe to be removed, got %v", settings.CustomProcessNames)
+	}
+}
+
+func newTestApp(t *testing.T) *App {
+	t.Helper()
+
+	configDir := t.TempDir()
+	t.Setenv("APPDATA", configDir)
+	t.Setenv("XDG_CONFIG_HOME", configDir)
+
+	return NewApp()
+}
+
+func containsAppTestString(values []string, expected string) bool {
+	for _, value := range values {
+		if value == expected {
+			return true
+		}
+	}
+
+	return false
 }
 
 func listenOnLocalTCPPortForAppTest(t *testing.T) (net.Listener, int) {

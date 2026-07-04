@@ -9,16 +9,31 @@ import (
 	"sort"
 	"strings"
 
+	"dev-resource-manager/internal/config"
+
 	gopsprocess "github.com/shirou/gopsutil/v3/process"
 )
 
 // List scans Windows processes and returns a best-effort snapshot.
 func List(ctx context.Context) ([]Info, error) {
+	rules, err := config.LoadDefaultProtectionRules(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load process protection rules: %w", err)
+	}
+
+	return ListWithProtector(ctx, rules)
+}
+
+// ListWithProtector scans Windows processes using the supplied protection rules.
+func ListWithProtector(ctx context.Context, protector Protector) ([]Info, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("scan Windows processes: %w", err)
+	}
+	if protector == nil {
+		protector = config.DefaultProtectionRules()
 	}
 
 	pids, err := gopsprocess.PidsWithContext(ctx)
@@ -57,7 +72,7 @@ func List(ctx context.Context) ([]Info, error) {
 			info.CPUPercent = roundOneDecimal(cpuPercent)
 		}
 
-		info.IsProtected = IsProtectedName(info.Name)
+		info.IsProtected = protector.IsProtectedName(info.Name)
 		processes = append(processes, info)
 	}
 

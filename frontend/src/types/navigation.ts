@@ -5,4 +5,5 @@ export interface PageDefinition {
     label: string;
     title: string;
     description: string;
+    eyebrow: string;
 }
