@@ -1,20 +1,22 @@
 import type {PageDefinition, PageId} from '../types/navigation';
+import type {Translator} from '../services/i18n';
 
 interface SidebarProps {
     appName: string;
     activePageId: PageId;
     bridgeStatus: string;
     pages: PageDefinition[];
+    t: Translator;
     onSelectPage: (pageId: PageId) => void;
 }
 
-function Sidebar({appName, activePageId, bridgeStatus, pages, onSelectPage}: SidebarProps) {
+function Sidebar({appName, activePageId, bridgeStatus, pages, t, onSelectPage}: SidebarProps) {
     return (
-        <aside className="sidebar" aria-label="Primary navigation">
+        <aside className="sidebar" aria-label={t('sidebar.navigation')}>
             <div className="brand">
                 <span className="brand-mark">DR</span>
                 <div>
-                    <p className="brand-kicker">Desktop</p>
+                    <p className="brand-kicker">{t('brand.kicker')}</p>
                     <strong>{appName}</strong>
                 </div>
             </div>

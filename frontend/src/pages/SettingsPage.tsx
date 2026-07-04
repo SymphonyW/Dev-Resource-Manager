@@ -5,11 +5,15 @@ import {
     deleteCustomProtectedProcessName,
     loadProtectionSettings,
 } from '../services/settings';
+import {languages, type LanguageCode, type Translator} from '../services/i18n';
 import type {PageDefinition} from '../types/navigation';
 import type {ProtectionSettings} from '../types/settings';
 
 interface SettingsPageProps {
+    language: LanguageCode;
     page: PageDefinition;
+    t: Translator;
+    onLanguageChange: (language: LanguageCode) => void;
 }
 
 const emptyProtectionSettings: ProtectionSettings = {
@@ -17,7 +21,7 @@ const emptyProtectionSettings: ProtectionSettings = {
     customProcessNames: [],
 };
 
-function SettingsPage({page}: SettingsPageProps) {
+function SettingsPage({language, page, t, onLanguageChange}: SettingsPageProps) {
     const [settings, setSettings] = useState<ProtectionSettings>(emptyProtectionSettings);
     const [customName, setCustomName] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -89,7 +93,7 @@ function SettingsPage({page}: SettingsPageProps) {
         <section className="page-panel settings-page" aria-labelledby={`${page.id}-title`}>
             <div className="page-header">
                 <div>
-                    <p className="eyebrow">Protection settings</p>
+                    <p className="eyebrow">{page.eyebrow}</p>
                     <h1 id={`${page.id}-title`}>{page.title}</h1>
                     <p className="page-description">{page.description}</p>
                 </div>
@@ -102,6 +106,29 @@ function SettingsPage({page}: SettingsPageProps) {
                 >
                     Refresh
                 </button>
+            </div>
+
+            <div className="settings-preferences-row">
+                <section className="settings-section settings-preferences" aria-labelledby="settings-preferences-title">
+                    <div className="settings-section-header">
+                        <h2 id="settings-preferences-title">{t('settings.preferences.title')}</h2>
+                    </div>
+                    <div className="settings-preference-body">
+                        <label className="filter-field">
+                            <span>{t('settings.language.label')}</span>
+                            <select
+                                aria-label={t('settings.language.label')}
+                                value={language}
+                                onChange={(event) => onLanguageChange(event.target.value as LanguageCode)}
+                            >
+                                {languages.map((option) => (
+                                    <option key={option.code} value={option.code}>{option.label}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <p>{t('settings.language.help')}</p>
+                    </div>
+                </section>
             </div>
 
             <form className="settings-add-form" onSubmit={handleAddCustomProcess}>

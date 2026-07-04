@@ -102,7 +102,7 @@ function ProcessesPage({page}: ProcessesPageProps) {
         <section className="page-panel process-page" aria-labelledby={`${page.id}-title`}>
             <div className="page-header">
                 <div>
-                    <p className="eyebrow">Process monitor</p>
+                    <p className="eyebrow">{page.eyebrow}</p>
                     <h1 id={`${page.id}-title`}>{page.title}</h1>
                     <p className="page-description">{page.description}</p>
                 </div>
@@ -189,7 +189,11 @@ function ProcessesPage({page}: ProcessesPageProps) {
                                     <td className="mono">{process.pid}</td>
                                     <td data-testid="process-name">{process.name || 'Unknown'}</td>
                                     <td className="muted-cell">{process.path || 'Unavailable'}</td>
-                                    <td className="muted-cell">{process.commandLine || 'Unavailable'}</td>
+                                    <td className="muted-cell" title={process.commandLine || 'Unavailable'}>
+                                        <span className="command-cell" title={process.commandLine || 'Unavailable'}>
+                                            {process.commandLine || 'Unavailable'}
+                                        </span>
+                                    </td>
                                     <td className="mono">{formatPercent(process.cpuPercent)}</td>
                                     <td className="mono">
                                         {formatMemorySize(process.memoryBytes)}
