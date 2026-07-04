@@ -15,7 +15,6 @@ import {AppName} from '../wailsjs/go/main/App';
 type BridgeStatus = 'connecting' | 'connected' | 'unavailable';
 
 function App() {
-    const [appName, setAppName] = useState('Dev Resource Manager');
     const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus>('connecting');
     const [activePageId, setActivePageId] = useState<PageId>(defaultPageId);
     const [language, setLanguage] = useState<LanguageCode>(() => resolveInitialLanguage());
@@ -25,8 +24,7 @@ function App() {
 
     useEffect(() => {
         AppName()
-            .then((name) => {
-                setAppName(name);
+            .then(() => {
                 setBridgeStatus('connected');
             })
             .catch(() => setBridgeStatus('unavailable'));
@@ -47,7 +45,6 @@ function App() {
     return (
         <div className="app-shell">
             <Sidebar
-                appName={appName}
                 activePageId={activePageId}
                 bridgeStatus={bridgeStatusLabel}
                 pages={pages}

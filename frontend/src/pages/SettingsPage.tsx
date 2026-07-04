@@ -9,6 +9,8 @@ import {languages, type LanguageCode, type Translator} from '../services/i18n';
 import type {PageDefinition} from '../types/navigation';
 import type {ProtectionSettings} from '../types/settings';
 
+const settingsRefreshIntervalMs = 10000;
+
 interface SettingsPageProps {
     language: LanguageCode;
     page: PageDefinition;
@@ -29,8 +31,10 @@ function SettingsPage({language, page, t, onLanguageChange}: SettingsPageProps) 
     const [errorMessage, setErrorMessage] = useState('');
     const [operationMessage, setOperationMessage] = useState('');
 
-    const loadSettings = useCallback(async () => {
-        setIsLoading(true);
+    const loadSettings = useCallback(async (showLoading = true) => {
+        if (showLoading) {
+            setIsLoading(true);
+        }
         setErrorMessage('');
 
         try {
@@ -38,14 +42,21 @@ function SettingsPage({language, page, t, onLanguageChange}: SettingsPageProps) 
             setSettings(nextSettings);
         } catch {
             setSettings(emptyProtectionSettings);
-            setErrorMessage('Unable to load protection settings.');
+            setErrorMessage(t('settings.errorLoad'));
         } finally {
-            setIsLoading(false);
+            if (showLoading) {
+                setIsLoading(false);
+            }
         }
-    }, []);
+    }, [t]);
 
     useEffect(() => {
-        void loadSettings();
+        void loadSettings(true);
+        const intervalId = window.setInterval(() => {
+            void loadSettings(false);
+        }, settingsRefreshIntervalMs);
+
+        return () => window.clearInterval(intervalId);
     }, [loadSettings]);
 
     const handleAddCustomProcess = async (event: FormEvent<HTMLFormElement>) => {
@@ -53,7 +64,7 @@ function SettingsPage({language, page, t, onLanguageChange}: SettingsPageProps) 
 
         const nextName = customName.trim();
         if (nextName === '') {
-            setErrorMessage('Custom protected process name cannot be empty.');
+            setErrorMessage(t('settings.customNameEmpty'));
             return;
         }
 
@@ -65,9 +76,9 @@ function SettingsPage({language, page, t, onLanguageChange}: SettingsPageProps) 
             const nextSettings = await addCustomProtectedProcessName(nextName);
             setSettings(nextSettings);
             setCustomName('');
-            setOperationMessage('Custom protected process added.');
+            setOperationMessage(t('settings.operationAdded'));
         } catch {
-            setErrorMessage('Unable to add custom protected process.');
+            setErrorMessage(t('settings.errorAdd'));
         } finally {
             setIsSaving(false);
         }
@@ -81,9 +92,9 @@ function SettingsPage({language, page, t, onLanguageChange}: SettingsPageProps) 
         try {
             const nextSettings = await deleteCustomProtectedProcessName(name);
             setSettings(nextSettings);
-            setOperationMessage('Custom protected process removed.');
+            setOperationMessage(t('settings.operationRemoved'));
         } catch {
-            setErrorMessage('Unable to remove custom protected process.');
+            setErrorMessage(t('settings.errorDelete'));
         } finally {
             setIsSaving(false);
         }
@@ -91,21 +102,12 @@ function SettingsPage({language, page, t, onLanguageChange}: SettingsPageProps) 
 
     return (
         <section className="page-panel settings-page" aria-labelledby={`${page.id}-title`}>
-            <div className="page-header">
+            <div className="page-header compact-page-header">
                 <div>
                     <p className="eyebrow">{page.eyebrow}</p>
                     <h1 id={`${page.id}-title`}>{page.title}</h1>
                     <p className="page-description">{page.description}</p>
                 </div>
-                <button
-                    aria-label="Refresh Settings"
-                    className="refresh-button"
-                    type="button"
-                    onClick={loadSettings}
-                    disabled={isLoading || isSaving}
-                >
-                    Refresh
-                </button>
             </div>
 
             <div className="settings-preferences-row">
@@ -133,9 +135,9 @@ function SettingsPage({language, page, t, onLanguageChange}: SettingsPageProps) 
 
             <form className="settings-add-form" onSubmit={handleAddCustomProcess}>
                 <label className="filter-field">
-                    <span>Custom protected process name</span>
+                    <span>{t('settings.customProcessName')}</span>
                     <input
-                        aria-label="Custom protected process name"
+                        aria-label={t('settings.customProcessName')}
                         value={customName}
                         onChange={(event) => setCustomName(event.target.value)}
                         placeholder="node.exe"
@@ -143,31 +145,31 @@ function SettingsPage({language, page, t, onLanguageChange}: SettingsPageProps) 
                     />
                 </label>
                 <button
-                    aria-label="Add protected process"
-                    className="refresh-button"
+                    aria-label={t('settings.addCustom')}
+                    className="primary-action-button"
                     type="submit"
                     disabled={isSaving}
                 >
-                    Add
+                    {t('common.add')}
                 </button>
             </form>
 
             {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}
             {operationMessage && <StatusMessage variant="success">{operationMessage}</StatusMessage>}
-            {isLoading && <StatusMessage variant="loading">Loading protection settings...</StatusMessage>}
+            {isLoading && <StatusMessage variant="loading">{t('settings.loading')}</StatusMessage>}
 
             {!isLoading && (
                 <div className="settings-grid">
                     <section className="settings-section" aria-labelledby="default-protection-title">
                         <div className="settings-section-header">
-                            <h2 id="default-protection-title">Default protected processes</h2>
+                            <h2 id="default-protection-title">{t('settings.defaultProcesses')}</h2>
                             <span className="settings-count">{settings.defaultProcessNames.length}</span>
                         </div>
-                        <ul className="protection-list" aria-label="Default protected process list">
+                        <ul className="protection-list" aria-label={t('settings.defaultProcesses')}>
                             {settings.defaultProcessNames.map((name) => (
                                 <li className="protection-list-row" key={name}>
                                     <span className="mono">{name}</span>
-                                    <span className="protected-badge">Default</span>
+                                    <span className="protected-badge">{t('badge.default')}</span>
                                 </li>
                             ))}
                         </ul>
@@ -175,24 +177,24 @@ function SettingsPage({language, page, t, onLanguageChange}: SettingsPageProps) 
 
                     <section className="settings-section" aria-labelledby="custom-protection-title">
                         <div className="settings-section-header">
-                            <h2 id="custom-protection-title">Custom protected processes</h2>
+                            <h2 id="custom-protection-title">{t('settings.customProcesses')}</h2>
                             <span className="settings-count">{settings.customProcessNames.length}</span>
                         </div>
                         {settings.customProcessNames.length === 0 ? (
-                            <StatusMessage variant="empty">No custom protected processes yet.</StatusMessage>
+                            <StatusMessage variant="empty">{t('settings.customEmpty')}</StatusMessage>
                         ) : (
-                            <ul className="protection-list" aria-label="Custom protected process list">
+                            <ul className="protection-list" aria-label={t('settings.customProcesses')}>
                                 {settings.customProcessNames.map((name) => (
                                     <li className="protection-list-row" key={name}>
                                         <span className="mono">{name}</span>
                                         <button
-                                            aria-label={`Delete ${name}`}
+                                            aria-label={`${t('settings.deleteCustom')} ${name}`}
                                             className="danger-button table-action-button"
                                             type="button"
                                             onClick={() => void handleDeleteCustomProcess(name)}
                                             disabled={isSaving}
                                         >
-                                            Delete
+                                            {t('common.delete')}
                                         </button>
                                     </li>
                                 ))}

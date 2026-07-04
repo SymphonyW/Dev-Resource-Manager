@@ -2,14 +2,18 @@ import {useCallback, useEffect, useMemo, useState} from 'react';
 import StatusMessage from '../components/StatusMessage';
 import {formatMemorySize, formatPercent, isHighMemoryUsage} from '../services/systemResources';
 import {killProcessByPID, loadProcessList} from '../services/processes';
+import type {Translator} from '../services/i18n';
 import type {PageDefinition} from '../types/navigation';
 import type {ProcessInfo, ProcessSortKey} from '../types/processes';
 
+const processRefreshIntervalMs = 5000;
+
 interface ProcessesPageProps {
     page: PageDefinition;
+    t: Translator;
 }
 
-function ProcessesPage({page}: ProcessesPageProps) {
+function ProcessesPage({page, t}: ProcessesPageProps) {
     const [processes, setProcesses] = useState<ProcessInfo[]>([]);
     const [nameSearch, setNameSearch] = useState('');
     const [pidSearch, setPidSearch] = useState('');
@@ -20,8 +24,10 @@ function ProcessesPage({page}: ProcessesPageProps) {
     const [operationMessage, setOperationMessage] = useState('');
     const [processToKill, setProcessToKill] = useState<ProcessInfo | null>(null);
 
-    const loadProcesses = useCallback(async () => {
-        setIsLoading(true);
+    const loadProcesses = useCallback(async (showLoading = true) => {
+        if (showLoading) {
+            setIsLoading(true);
+        }
         setErrorMessage('');
 
         try {
@@ -29,14 +35,21 @@ function ProcessesPage({page}: ProcessesPageProps) {
             setProcesses(nextProcesses);
         } catch {
             setProcesses([]);
-            setErrorMessage('Unable to load process list.');
+            setErrorMessage(t('processes.error'));
         } finally {
-            setIsLoading(false);
+            if (showLoading) {
+                setIsLoading(false);
+            }
         }
-    }, []);
+    }, [t]);
 
     useEffect(() => {
-        void loadProcesses();
+        void loadProcesses(true);
+        const intervalId = window.setInterval(() => {
+            void loadProcesses(false);
+        }, processRefreshIntervalMs);
+
+        return () => window.clearInterval(intervalId);
     }, [loadProcesses]);
 
     const openKillConfirmation = (process: ProcessInfo) => {
@@ -64,10 +77,10 @@ function ProcessesPage({page}: ProcessesPageProps) {
             setProcessToKill(null);
 
             if (result.success) {
-                await loadProcesses();
+                await loadProcesses(false);
             }
         } catch {
-            setOperationMessage('Unable to end process.');
+            setOperationMessage(t('processes.killError'));
         } finally {
             setIsKilling(false);
         }
@@ -96,63 +109,54 @@ function ProcessesPage({page}: ProcessesPageProps) {
     }, [nameSearch, pidSearch, processes, sortKey]);
 
     const isFiltered = nameSearch.trim() !== '' || pidSearch.trim() !== '';
-    const emptyMessage = isFiltered ? 'No processes match the current filters.' : 'No processes found.';
+    const emptyMessage = isFiltered ? t('processes.emptyFiltered') : t('processes.empty');
 
     return (
         <section className="page-panel process-page" aria-labelledby={`${page.id}-title`}>
-            <div className="page-header">
+            <div className="page-header compact-page-header">
                 <div>
                     <p className="eyebrow">{page.eyebrow}</p>
                     <h1 id={`${page.id}-title`}>{page.title}</h1>
                     <p className="page-description">{page.description}</p>
                 </div>
-                <button
-                    aria-label="Refresh Processes"
-                    className="refresh-button"
-                    type="button"
-                    onClick={loadProcesses}
-                    disabled={isLoading}
-                >
-                    Refresh
-                </button>
             </div>
 
-            <div className="process-toolbar">
+            <div className="process-toolbar compact-toolbar">
                 <label className="filter-field">
-                    <span>Search by process name</span>
+                    <span>{t('filter.processName')}</span>
                     <input
-                        aria-label="Search by process name"
+                        aria-label={t('filter.processName')}
                         value={nameSearch}
                         onChange={(event) => setNameSearch(event.target.value)}
                         placeholder="node.exe"
                     />
                 </label>
-                <label className="filter-field">
-                    <span>Search by PID</span>
+                <label className="filter-field compact-filter">
+                    <span>{t('field.pid')}</span>
                     <input
-                        aria-label="Search by PID"
+                        aria-label={t('field.pid')}
                         inputMode="numeric"
                         value={pidSearch}
                         onChange={(event) => setPidSearch(event.target.value)}
                         placeholder="5173"
                     />
                 </label>
-                <div className="sort-controls" aria-label="Sort processes">
+                <div className="sort-controls" aria-label={t('filter.search')}>
                     <button
-                        aria-label="Sort by Memory"
+                        aria-label={t('sort.memory')}
                         className={sortKey === 'memory' ? 'sort-button active' : 'sort-button'}
                         type="button"
                         onClick={() => setSortKey('memory')}
                     >
-                        Memory
+                        {t('sort.memory')}
                     </button>
                     <button
-                        aria-label="Sort by CPU"
+                        aria-label={t('sort.cpu')}
                         className={sortKey === 'cpu' ? 'sort-button active' : 'sort-button'}
                         type="button"
                         onClick={() => setSortKey('cpu')}
                     >
-                        CPU
+                        {t('sort.cpu')}
                     </button>
                 </div>
             </div>
@@ -160,7 +164,7 @@ function ProcessesPage({page}: ProcessesPageProps) {
             {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}
             {operationMessage && <StatusMessage variant="success">{operationMessage}</StatusMessage>}
             {isLoading && processes.length === 0 && (
-                <StatusMessage variant="loading">Loading process list...</StatusMessage>
+                <StatusMessage variant="loading">{t('processes.loading')}</StatusMessage>
             )}
 
             {!isLoading && !errorMessage && visibleProcesses.length === 0 && (
@@ -168,55 +172,60 @@ function ProcessesPage({page}: ProcessesPageProps) {
             )}
 
             {visibleProcesses.length > 0 && (
-                <div className="process-table-wrap">
-                    <table className="process-table process-list-table" aria-label="Process list">
+                <div className="process-table-wrap compact-table-wrap">
+                    <table className="process-table process-list-table compact-data-table" aria-label={t('table.processList')}>
                         <thead>
                             <tr>
-                                <th>PID</th>
-                                <th>Process Name</th>
-                                <th>Path</th>
-                                <th>Command</th>
-                                <th>CPU</th>
-                                <th>Memory</th>
-                                <th>User</th>
-                                <th>Protected</th>
-                                <th>Action</th>
+                                <th>{t('field.pid')}</th>
+                                <th>{t('field.processName')}</th>
+                                <th>{t('field.path')}</th>
+                                <th>{t('field.command')}</th>
+                                <th>{t('field.cpu')}</th>
+                                <th>{t('field.memory')}</th>
+                                <th>{t('field.user')}</th>
+                                <th>{t('field.protected')}</th>
+                                <th>{t('field.action')}</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {visibleProcesses.map((process) => (
-                                <tr key={process.pid} className={processRowClassName(process)}>
-                                    <td className="mono">{process.pid}</td>
-                                    <td data-testid="process-name">{process.name || 'Unknown'}</td>
-                                    <td className="muted-cell">{process.path || 'Unavailable'}</td>
-                                    <td className="muted-cell" title={process.commandLine || 'Unavailable'}>
-                                        <span className="command-cell" title={process.commandLine || 'Unavailable'}>
-                                            {process.commandLine || 'Unavailable'}
-                                        </span>
-                                    </td>
-                                    <td className="mono">{formatPercent(process.cpuPercent)}</td>
-                                    <td className="mono">
-                                        {formatMemorySize(process.memoryBytes)}
-                                        {isHighMemoryUsage(process.memoryBytes) && <span className="memory-badge">High</span>}
-                                    </td>
-                                    <td>{process.user || 'Unavailable'}</td>
-                                    <td>
-                                        <span className={process.isProtected ? 'protected-badge' : 'standard-badge'}>
-                                            {process.isProtected ? 'Protected' : 'Standard'}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <button
-                                            className="danger-button table-action-button"
-                                            type="button"
-                                            disabled={process.isProtected || isKilling}
-                                            onClick={() => openKillConfirmation(process)}
-                                        >
-                                            结束进程
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
+                            {visibleProcesses.map((process) => {
+                                const commandLine = process.commandLine || t('common.unavailable');
+                                const path = process.path || t('common.unavailable');
+
+                                return (
+                                    <tr key={process.pid} className={processRowClassName(process)}>
+                                        <td className="mono">{process.pid}</td>
+                                        <td data-testid="process-name">{process.name || t('common.unknown')}</td>
+                                        <td className="muted-cell compact-path-cell" title={path}>{path}</td>
+                                        <td className="muted-cell" title={commandLine}>
+                                            <span className="command-cell" title={commandLine}>{commandLine}</span>
+                                        </td>
+                                        <td className="mono metric-cell">{formatPercent(process.cpuPercent)}</td>
+                                        <td className="mono metric-cell">
+                                            {formatMemorySize(process.memoryBytes)}
+                                            {isHighMemoryUsage(process.memoryBytes) && <span className="memory-badge">{t('badge.high')}</span>}
+                                        </td>
+                                        <td className="compact-user-cell" title={process.user || t('common.unavailable')}>
+                                            {process.user || t('common.unavailable')}
+                                        </td>
+                                        <td>
+                                            <span className={process.isProtected ? 'protected-badge' : 'standard-badge'}>
+                                                {process.isProtected ? t('badge.protected') : t('badge.standard')}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <button
+                                                className="danger-button table-action-button"
+                                                type="button"
+                                                disabled={process.isProtected || isKilling}
+                                                onClick={() => openKillConfirmation(process)}
+                                            >
+                                                {t('terminate.process')}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
@@ -230,32 +239,32 @@ function ProcessesPage({page}: ProcessesPageProps) {
                         role="dialog"
                     >
                         <div className="dialog-header">
-                            <h2 id="kill-process-dialog-title">Confirm process termination</h2>
+                            <h2 id="kill-process-dialog-title">{t('dialog.process.title')}</h2>
                             <button
-                                aria-label="Close"
+                                aria-label={t('common.close')}
                                 className="dialog-close-button"
                                 type="button"
                                 onClick={closeKillConfirmation}
                                 disabled={isKilling}
                             >
-                                Close
+                                {t('common.close')}
                             </button>
                         </div>
                         <dl className="confirmation-details">
                             <div>
-                                <dt>PID</dt>
+                                <dt>{t('field.pid')}</dt>
                                 <dd className="mono">{processToKill.pid}</dd>
                             </div>
                             <div>
-                                <dt>Process Name</dt>
-                                <dd>{processToKill.name || 'Unknown'}</dd>
+                                <dt>{t('field.processName')}</dt>
+                                <dd>{processToKill.name || t('common.unknown')}</dd>
                             </div>
                             <div>
-                                <dt>Path</dt>
-                                <dd>{processToKill.path || 'Unavailable'}</dd>
+                                <dt>{t('field.path')}</dt>
+                                <dd>{processToKill.path || t('common.unavailable')}</dd>
                             </div>
                             <div>
-                                <dt>Memory</dt>
+                                <dt>{t('field.memory')}</dt>
                                 <dd className="mono">{formatMemorySize(processToKill.memoryBytes)}</dd>
                             </div>
                         </dl>
@@ -266,7 +275,7 @@ function ProcessesPage({page}: ProcessesPageProps) {
                                 onClick={closeKillConfirmation}
                                 disabled={isKilling}
                             >
-                                Cancel
+                                {t('common.cancel')}
                             </button>
                             <button
                                 className="danger-button"
@@ -274,7 +283,7 @@ function ProcessesPage({page}: ProcessesPageProps) {
                                 onClick={confirmKillProcess}
                                 disabled={isKilling}
                             >
-                                Confirm End Process
+                                {t('dialog.action.confirmEndProcess')}
                             </button>
                         </div>
                     </section>

@@ -6,7 +6,7 @@ import type {PageDefinition} from '../types/navigation';
 import type {SystemResourceInfo} from '../types/systemResources';
 
 const resourceRefreshIntervalMs = 5000;
-const maxHistoryPoints = 24;
+const maxHistoryPoints = 30;
 
 interface DashboardPageProps {
     page: PageDefinition;
@@ -23,35 +23,35 @@ function DashboardPage({page, t}: DashboardPageProps) {
     const [resourceHistory, setResourceHistory] = useState<ResourceHistoryPoint[]>([]);
     const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [isRefreshing, setIsRefreshing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
     const loadResources = useCallback(async (showLoading = true) => {
         if (showLoading) {
             setIsLoading(true);
-        } else {
-            setIsRefreshing(true);
         }
         setErrorMessage('');
 
         try {
             const nextResourceInfo = await loadSystemResourceInfo();
+            const nextPoint = {
+                cpuPercent: clampPercent(nextResourceInfo.cpuPercent),
+                memoryPercent: getMemoryUsagePercent(nextResourceInfo),
+            };
+
             setResourceInfo(nextResourceInfo);
             setLastUpdatedAt(new Date());
-            setResourceHistory((currentHistory) => [
-                ...currentHistory,
-                {
-                    cpuPercent: clampPercent(nextResourceInfo.cpuPercent),
-                    memoryPercent: getMemoryUsagePercent(nextResourceInfo),
-                },
-            ].slice(-maxHistoryPoints));
+            setResourceHistory((currentHistory) => {
+                const seededHistory = currentHistory.length === 0
+                    ? Array.from({length: maxHistoryPoints - 1}, () => nextPoint)
+                    : currentHistory;
+
+                return [...seededHistory, nextPoint].slice(-maxHistoryPoints);
+            });
         } catch {
             setErrorMessage(t('dashboard.error'));
         } finally {
             if (showLoading) {
                 setIsLoading(false);
-            } else {
-                setIsRefreshing(false);
             }
         }
     }, [t]);
@@ -78,21 +78,13 @@ function DashboardPage({page, t}: DashboardPageProps) {
         : [];
 
     return (
-        <section className="page-panel" aria-labelledby={`${page.id}-title`}>
-            <div className="page-header">
+        <section className="page-panel dashboard-page" aria-labelledby={`${page.id}-title`}>
+            <div className="page-header compact-page-header">
                 <div>
                     <p className="eyebrow">{page.eyebrow}</p>
                     <h1 id={`${page.id}-title`}>{page.title}</h1>
                     <p className="page-description">{page.description}</p>
                 </div>
-                <button
-                    className="refresh-button"
-                    type="button"
-                    onClick={() => void loadResources(true)}
-                    disabled={isLoading || isRefreshing}
-                >
-                    {t('common.refresh')}
-                </button>
             </div>
 
             {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}
@@ -102,45 +94,26 @@ function DashboardPage({page, t}: DashboardPageProps) {
 
             {resourceInfo && (
                 <>
-                    <div className="resource-chart-grid">
-                        <section className="resource-chart-panel">
-                            <div className="resource-chart-heading">
-                                <div>
-                                    <h2>{t('dashboard.chart.cpu')}</h2>
-                                    <p>{t('dashboard.autoRefresh')}</p>
-                                </div>
-                                <strong>{formatPercent(resourceInfo.cpuPercent)}</strong>
-                            </div>
-                            <svg
-                                aria-label={t('dashboard.chart.cpuAria')}
-                                className="cpu-sparkline"
-                                role="img"
-                                viewBox="0 0 100 44"
-                                preserveAspectRatio="none"
-                            >
-                                <polyline points={buildSparklinePoints(resourceHistory, 'cpuPercent')}/>
-                            </svg>
-                        </section>
+                    <div className="resource-chart-grid task-manager-grid">
+                        <ResourceGraph
+                            ariaLabel={t('dashboard.chart.cpuAria')}
+                            title={t('dashboard.chart.cpu')}
+                            subtitle={t('dashboard.autoRefresh')}
+                            value={formatPercent(resourceInfo.cpuPercent)}
+                            history={resourceHistory}
+                            historyKey="cpuPercent"
+                            t={t}
+                        />
 
-                        <section className="resource-chart-panel">
-                            <div className="resource-chart-heading">
-                                <div>
-                                    <h2>{t('dashboard.chart.memory')}</h2>
-                                    <p>{formatMemorySize(resourceInfo.usedMemoryBytes)} / {formatMemorySize(resourceInfo.totalMemoryBytes)}</p>
-                                </div>
-                                <strong>{formatPercent(memoryPercent)}</strong>
-                            </div>
-                            <div
-                                aria-label={t('dashboard.chart.memoryAria')}
-                                aria-valuemax={100}
-                                aria-valuemin={0}
-                                aria-valuenow={Math.round(memoryPercent)}
-                                className="memory-usage-meter"
-                                role="meter"
-                            >
-                                <span style={{width: `${memoryPercent}%`}}/>
-                            </div>
-                        </section>
+                        <ResourceGraph
+                            ariaLabel={t('dashboard.chart.memoryAria')}
+                            title={t('dashboard.chart.memory')}
+                            subtitle={`${formatMemorySize(resourceInfo.usedMemoryBytes)} / ${formatMemorySize(resourceInfo.totalMemoryBytes)}`}
+                            value={formatPercent(memoryPercent)}
+                            history={resourceHistory}
+                            historyKey="memoryPercent"
+                            t={t}
+                        />
                     </div>
 
                     <dl className="resource-grid" aria-label="System resource metrics">
@@ -163,6 +136,48 @@ function DashboardPage({page, t}: DashboardPageProps) {
     );
 }
 
+interface ResourceGraphProps {
+    ariaLabel: string;
+    history: ResourceHistoryPoint[];
+    historyKey: keyof ResourceHistoryPoint;
+    subtitle: string;
+    title: string;
+    value: string;
+    t: Translator;
+}
+
+function ResourceGraph({ariaLabel, history, historyKey, subtitle, title, value, t}: ResourceGraphProps) {
+    const points = buildSparklinePoints(history, historyKey);
+    const areaPath = buildAreaPath(history, historyKey);
+
+    return (
+        <section className="resource-chart-panel task-manager-chart">
+            <div className="resource-chart-heading">
+                <div>
+                    <h2>{title}</h2>
+                    <p>{subtitle}</p>
+                </div>
+                <strong>{value}</strong>
+            </div>
+            <div className="task-chart-frame">
+                <span className="chart-axis-label chart-axis-top">100%</span>
+                <span className="chart-axis-label chart-axis-bottom">0</span>
+                <svg
+                    aria-label={ariaLabel}
+                    className="cpu-sparkline"
+                    role="img"
+                    viewBox="0 0 100 64"
+                    preserveAspectRatio="none"
+                >
+                    <path d={areaPath}/>
+                    <polyline points={points}/>
+                </svg>
+                <span className="chart-time-label">{t('dashboard.chart.sixtySeconds')}</span>
+            </div>
+        </section>
+    );
+}
+
 function getMemoryUsagePercent(resourceInfo: SystemResourceInfo): number {
     if (resourceInfo.totalMemoryBytes <= 0) {
         return 0;
@@ -179,21 +194,39 @@ function clampPercent(value: number): number {
     return Math.min(100, Math.max(0, value));
 }
 
-function buildSparklinePoints(history: ResourceHistoryPoint[], key: keyof ResourceHistoryPoint): string {
+function getGraphPoints(history: ResourceHistoryPoint[], key: keyof ResourceHistoryPoint): Array<{x: number; y: number}> {
     if (history.length === 0) {
-        return '';
+        return [];
     }
 
     const points = history.length === 1 ? [history[0], history[0]] : history;
     const xStep = points.length > 1 ? 100 / (points.length - 1) : 100;
 
-    return points
-        .map((point, index) => {
-            const x = index * xStep;
-            const y = 44 - (clampPercent(point[key]) / 100) * 38 - 3;
-            return `${x.toFixed(2)},${y.toFixed(2)}`;
-        })
+    return points.map((point, index) => {
+        const x = index * xStep;
+        const y = 62 - (clampPercent(point[key]) / 100) * 58;
+
+        return {x, y};
+    });
+}
+
+function buildSparklinePoints(history: ResourceHistoryPoint[], key: keyof ResourceHistoryPoint): string {
+    return getGraphPoints(history, key)
+        .map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`)
         .join(' ');
+}
+
+function buildAreaPath(history: ResourceHistoryPoint[], key: keyof ResourceHistoryPoint): string {
+    const points = getGraphPoints(history, key);
+    if (points.length === 0) {
+        return '';
+    }
+
+    const line = points
+        .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
+        .join(' ');
+
+    return `${line} L 100 64 L 0 64 Z`;
 }
 
 export default DashboardPage;

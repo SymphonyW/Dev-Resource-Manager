@@ -4,16 +4,20 @@ import {buildCleanupCandidates} from '../services/cleanup';
 import {isCommonDevelopmentPort, loadPortList} from '../services/ports';
 import {killProcessByPID, loadProcessList} from '../services/processes';
 import {formatMemorySize, formatPercent, isHighMemoryUsage} from '../services/systemResources';
+import type {Translator} from '../services/i18n';
 import type {CleanupCandidate} from '../types/cleanup';
 import type {PageDefinition} from '../types/navigation';
 import type {PortInfo} from '../types/ports';
 import type {ProcessInfo} from '../types/processes';
 
+const cleanupRefreshIntervalMs = 5000;
+
 interface CleanupPageProps {
     page: PageDefinition;
+    t: Translator;
 }
 
-function CleanupPage({page}: CleanupPageProps) {
+function CleanupPage({page, t}: CleanupPageProps) {
     const [processes, setProcesses] = useState<ProcessInfo[]>([]);
     const [ports, setPorts] = useState<PortInfo[]>([]);
     const [selectedPIDs, setSelectedPIDs] = useState<Set<number>>(new Set());
@@ -23,8 +27,10 @@ function CleanupPage({page}: CleanupPageProps) {
     const [operationMessage, setOperationMessage] = useState('');
     const [isConfirmingBatch, setIsConfirmingBatch] = useState(false);
 
-    const loadCleanupData = useCallback(async () => {
-        setIsLoading(true);
+    const loadCleanupData = useCallback(async (showLoading = true) => {
+        if (showLoading) {
+            setIsLoading(true);
+        }
         setErrorMessage('');
 
         try {
@@ -37,14 +43,21 @@ function CleanupPage({page}: CleanupPageProps) {
         } catch {
             setProcesses([]);
             setPorts([]);
-            setErrorMessage('Unable to load cleanup candidates.');
+            setErrorMessage(t('cleanup.error'));
         } finally {
-            setIsLoading(false);
+            if (showLoading) {
+                setIsLoading(false);
+            }
         }
-    }, []);
+    }, [t]);
 
     useEffect(() => {
-        void loadCleanupData();
+        void loadCleanupData(true);
+        const intervalId = window.setInterval(() => {
+            void loadCleanupData(false);
+        }, cleanupRefreshIntervalMs);
+
+        return () => window.clearInterval(intervalId);
     }, [loadCleanupData]);
 
     const candidates = useMemo(() => {
@@ -130,10 +143,10 @@ function CleanupPage({page}: CleanupPageProps) {
 
         setIsConfirmingBatch(false);
         setSelectedPIDs(new Set());
-        setOperationMessage(`${candidatesToKill.length} cleanup operations finished. ${successCount} succeeded, ${failureCount} failed.`);
+        setOperationMessage(`${candidatesToKill.length} ${t('cleanup.operationSummary')} ${successCount} ${t('operation.succeeded')}, ${failureCount} ${t('operation.failed')}.`);
 
         try {
-            await loadCleanupData();
+            await loadCleanupData(false);
         } finally {
             setIsKilling(false);
         }
@@ -141,7 +154,7 @@ function CleanupPage({page}: CleanupPageProps) {
 
     return (
         <section className="page-panel process-page" aria-labelledby={`${page.id}-title`}>
-            <div className="page-header">
+            <div className="page-header compact-page-header">
                 <div>
                     <p className="eyebrow">{page.eyebrow}</p>
                     <h1 id={`${page.id}-title`}>{page.title}</h1>
@@ -149,21 +162,12 @@ function CleanupPage({page}: CleanupPageProps) {
                 </div>
                 <div className="cleanup-actions">
                     <button
-                        aria-label="Refresh Cleanup"
-                        className="refresh-button"
-                        type="button"
-                        onClick={loadCleanupData}
-                        disabled={isLoading || isKilling}
-                    >
-                        Refresh
-                    </button>
-                    <button
                         className="danger-button"
                         type="button"
                         onClick={openBatchConfirmation}
                         disabled={selectedCandidates.length === 0 || isKilling}
                     >
-                        End selected processes
+                        {t('terminate.selected')}
                     </button>
                 </div>
             </div>
@@ -171,25 +175,25 @@ function CleanupPage({page}: CleanupPageProps) {
             {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}
             {operationMessage && <StatusMessage variant="success">{operationMessage}</StatusMessage>}
             {isLoading && candidates.length === 0 && (
-                <StatusMessage variant="loading">Loading cleanup candidates...</StatusMessage>
+                <StatusMessage variant="loading">{t('cleanup.loading')}</StatusMessage>
             )}
 
             {!isLoading && !errorMessage && candidates.length === 0 && (
-                <StatusMessage variant="empty">No development-related processes found.</StatusMessage>
+                <StatusMessage variant="empty">{t('cleanup.empty')}</StatusMessage>
             )}
 
             {candidates.length > 0 && (
-                <div className="process-table-wrap">
-                    <table className="process-table cleanup-table" aria-label="Cleanup candidate list">
+                <div className="process-table-wrap compact-table-wrap">
+                    <table className="process-table cleanup-table compact-data-table" aria-label={t('table.cleanupList')}>
                         <thead>
                             <tr>
-                                <th>Select</th>
-                                <th>PID</th>
-                                <th>Process Name</th>
-                                <th>Memory</th>
-                                <th>CPU</th>
-                                <th>Ports</th>
-                                <th>Protected</th>
+                                <th>{t('field.select')}</th>
+                                <th>{t('field.pid')}</th>
+                                <th>{t('field.processName')}</th>
+                                <th>{t('field.memory')}</th>
+                                <th>{t('field.cpu')}</th>
+                                <th>{t('field.ports')}</th>
+                                <th>{t('field.protected')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -197,7 +201,7 @@ function CleanupPage({page}: CleanupPageProps) {
                                 <tr key={candidate.pid} className={cleanupRowClassName(candidate)}>
                                     <td>
                                         <input
-                                            aria-label={`Select ${candidate.name || 'Unknown'} PID ${candidate.pid}`}
+                                            aria-label={`${t('cleanup.selectProcess')} ${candidate.name || t('common.unknown')} PID ${candidate.pid}`}
                                             checked={selectedPIDs.has(candidate.pid)}
                                             disabled={candidate.isProtected || isKilling}
                                             type="checkbox"
@@ -205,16 +209,16 @@ function CleanupPage({page}: CleanupPageProps) {
                                         />
                                     </td>
                                     <td className="mono">{candidate.pid}</td>
-                                    <td data-testid="cleanup-process-name">{candidate.name || 'Unknown'}</td>
-                                    <td className="mono">
+                                    <td data-testid="cleanup-process-name">{candidate.name || t('common.unknown')}</td>
+                                    <td className="mono metric-cell">
                                         {formatMemorySize(candidate.memoryBytes)}
-                                        {isHighMemoryUsage(candidate.memoryBytes) && <span className="memory-badge">High</span>}
+                                        {isHighMemoryUsage(candidate.memoryBytes) && <span className="memory-badge">{t('badge.high')}</span>}
                                     </td>
-                                    <td className="mono">{formatPercent(candidate.cpuPercent)}</td>
-                                    <td className="mono">{renderPorts(candidate.ports)}</td>
+                                    <td className="mono metric-cell">{formatPercent(candidate.cpuPercent)}</td>
+                                    <td className="mono">{renderPorts(candidate.ports, t)}</td>
                                     <td>
                                         <span className={candidate.isProtected ? 'protected-badge' : 'standard-badge'}>
-                                            {candidate.isProtected ? 'Protected' : 'Standard'}
+                                            {candidate.isProtected ? t('badge.protected') : t('badge.standard')}
                                         </span>
                                     </td>
                                 </tr>
@@ -232,25 +236,25 @@ function CleanupPage({page}: CleanupPageProps) {
                         role="dialog"
                     >
                         <div className="dialog-header">
-                            <h2 id="cleanup-dialog-title">Confirm cleanup termination</h2>
+                            <h2 id="cleanup-dialog-title">{t('dialog.cleanup.title')}</h2>
                             <button
-                                aria-label="Close"
+                                aria-label={t('common.close')}
                                 className="dialog-close-button"
                                 type="button"
                                 onClick={closeBatchConfirmation}
                                 disabled={isKilling}
                             >
-                                Close
+                                {t('common.close')}
                             </button>
                         </div>
-                        <p className="dialog-summary">{selectedCandidates.length} selected processes</p>
+                        <p className="dialog-summary">{selectedCandidates.length} {t('cleanup.dialog.summary')}</p>
                         <dl className="confirmation-details">
                             {selectedCandidates.map((candidate) => (
                                 <div key={candidate.pid}>
                                     <dt className="mono">{candidate.pid}</dt>
                                     <dd>
-                                        <span>{candidate.name || 'Unknown'}</span>
-                                        <span className="muted-cell"> - {formatMemorySize(candidate.memoryBytes)} - ports {formatPorts(candidate.ports)}</span>
+                                        <span>{candidate.name || t('common.unknown')}</span>
+                                        <span className="muted-cell"> - {formatMemorySize(candidate.memoryBytes)} - {t('field.ports')} {formatPorts(candidate.ports, t)}</span>
                                     </dd>
                                 </div>
                             ))}
@@ -262,7 +266,7 @@ function CleanupPage({page}: CleanupPageProps) {
                                 onClick={closeBatchConfirmation}
                                 disabled={isKilling}
                             >
-                                Cancel
+                                {t('common.cancel')}
                             </button>
                             <button
                                 className="danger-button"
@@ -270,7 +274,7 @@ function CleanupPage({page}: CleanupPageProps) {
                                 onClick={confirmBatchKill}
                                 disabled={isKilling}
                             >
-                                Confirm End Selected
+                                {t('dialog.action.confirmEndSelected')}
                             </button>
                         </div>
                     </section>
@@ -280,17 +284,17 @@ function CleanupPage({page}: CleanupPageProps) {
     );
 }
 
-function formatPorts(ports: number[]): string {
+function formatPorts(ports: number[], t: Translator): string {
     if (ports.length === 0) {
-        return 'None';
+        return t('common.none');
     }
 
     return ports.join(', ');
 }
 
-function renderPorts(ports: number[]) {
+function renderPorts(ports: number[], t: Translator) {
     if (ports.length === 0) {
-        return 'None';
+        return t('common.none');
     }
 
     return ports.map((port, index) => (
