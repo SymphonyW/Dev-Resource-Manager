@@ -113,15 +113,7 @@ function PortsPage({page, t}: PortsPageProps) {
     const emptyMessage = isFiltered ? t('ports.emptyFiltered') : t('ports.empty');
 
     return (
-        <section className="page-panel process-page" aria-labelledby={`${page.id}-title`}>
-            <div className="page-header compact-page-header">
-                <div>
-                    <p className="eyebrow">{page.eyebrow}</p>
-                    <h1 id={`${page.id}-title`}>{page.title}</h1>
-                    <p className="page-description">{page.description}</p>
-                </div>
-            </div>
-
+        <section className="page-panel process-page" aria-label={page.title}>
             <div className="port-toolbar compact-toolbar">
                 <label className="filter-field compact-filter">
                     <span>{t('filter.port')}</span>
@@ -190,7 +182,7 @@ function PortsPage({page, t}: PortsPageProps) {
                                 <th>{t('field.pid')}</th>
                                 <th>{t('field.processName')}</th>
                                 <th>{t('field.processPath')}</th>
-                                <th>{t('field.action')}</th>
+                                <th className="sticky-action-column">{t('field.action')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -210,7 +202,7 @@ function PortsPage({page, t}: PortsPageProps) {
                                         <td className="muted-cell compact-path-cell" title={port.processPath || t('common.unavailable')}>
                                             {port.processPath || t('common.unavailable')}
                                         </td>
-                                        <td>
+                                        <td className="sticky-action-column">
                                             <button
                                                 aria-label={t('terminate.occupancy')}
                                                 className="danger-button table-action-button"

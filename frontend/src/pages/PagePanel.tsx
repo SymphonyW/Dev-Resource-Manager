@@ -47,10 +47,7 @@ function PagePanel({language, page, t, onLanguageChange}: PagePanelProps) {
     }
 
     return (
-        <section className="page-panel" aria-labelledby={`${page.id}-title`}>
-            <p className="eyebrow">{page.eyebrow}</p>
-            <h1 id={`${page.id}-title`}>{t('page.unsupported.title')}</h1>
-            <p className="page-description">{t('page.unsupported.description')}</p>
+        <section className="page-panel" aria-label={t('page.unsupported.title')}>
             <div className="page-empty-state">
                 <span>{t('page.unsupported.status')}</span>
                 <p>{t('page.unsupported.description')}</p>

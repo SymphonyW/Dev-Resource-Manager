@@ -153,23 +153,26 @@ function CleanupPage({page, t}: CleanupPageProps) {
     };
 
     return (
-        <section className="page-panel process-page" aria-labelledby={`${page.id}-title`}>
-            <div className="page-header compact-page-header">
-                <div>
-                    <p className="eyebrow">{page.eyebrow}</p>
-                    <h1 id={`${page.id}-title`}>{page.title}</h1>
-                    <p className="page-description">{page.description}</p>
+        <section className="page-panel process-page" aria-label={page.title}>
+            <div className="cleanup-toolbar" role="toolbar" aria-label={t('cleanup.actions')}>
+                <div className="cleanup-toolbar-stats">
+                    <div className="cleanup-toolbar-stat">
+                        <span>{t('cleanup.candidates')}</span>
+                        <strong>{candidates.length}</strong>
+                    </div>
+                    <div className="cleanup-toolbar-stat">
+                        <span>{t('cleanup.selected')}</span>
+                        <strong>{selectedCandidates.length}</strong>
+                    </div>
                 </div>
-                <div className="cleanup-actions">
-                    <button
-                        className="danger-button"
-                        type="button"
-                        onClick={openBatchConfirmation}
-                        disabled={selectedCandidates.length === 0 || isKilling}
-                    >
-                        {t('terminate.selected')}
-                    </button>
-                </div>
+                <button
+                    className="danger-button"
+                    type="button"
+                    onClick={openBatchConfirmation}
+                    disabled={selectedCandidates.length === 0 || isKilling}
+                >
+                    {t('terminate.selected')}
+                </button>
             </div>
 
             {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}

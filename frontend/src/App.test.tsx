@@ -168,6 +168,10 @@ describe('App layout navigation', () => {
             totalMemoryBytes: 16 * 1024 * 1024 * 1024,
             usedMemoryBytes: 9.5 * 1024 * 1024 * 1024,
             freeMemoryBytes: 6.5 * 1024 * 1024 * 1024,
+            gpuPercent: 18.2,
+            totalVRAMBytes: 8 * 1024 * 1024 * 1024,
+            usedVRAMBytes: 3 * 1024 * 1024 * 1024,
+            freeVRAMBytes: 5 * 1024 * 1024 * 1024,
             processCount: 184,
             portCount: 37,
         });
@@ -216,7 +220,9 @@ describe('App layout navigation', () => {
         expect(screen.getByRole('button', {name: 'Cleanup'})).toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'Logs'})).toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'Settings'})).toBeInTheDocument();
-        expect(await screen.findByRole('heading', {name: 'Dashboard'})).toBeInTheDocument();
+        expect(await screen.findByLabelText('CPU usage chart')).toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Dashboard'})).not.toBeInTheDocument();
+        expect(screen.queryByText('System overview')).not.toBeInTheDocument();
     });
 
     it('switches the main content when a navigation item is selected', async () => {
@@ -225,9 +231,28 @@ describe('App layout navigation', () => {
         fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
 
         expect(screen.getByRole('button', {name: 'Ports'})).toHaveAttribute('aria-current', 'page');
-        expect(screen.getByRole('heading', {name: 'Ports'})).toBeInTheDocument();
-        expect(screen.getByText('Review local TCP and UDP ports and the owning process.')).toBeInTheDocument();
         expect(await screen.findByText('node.exe')).toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Ports'})).not.toBeInTheDocument();
+        expect(screen.queryByText('Review local TCP and UDP ports and the owning process.')).not.toBeInTheDocument();
+    });
+
+    it('does not render page title and description headers above app workspaces', async () => {
+        render(<App/>);
+
+        expect(await screen.findByLabelText('CPU usage chart')).toBeInTheDocument();
+        expect(screen.queryByText('System overview')).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Dashboard'})).not.toBeInTheDocument();
+        expect(screen.queryByText('Monitor CPU, memory, GPU, VRAM, processes, and occupied ports in real time.')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+        expect(screen.queryByText('Process monitor')).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Processes'})).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', {name: 'Settings'}));
+        expect(await screen.findByText('redis-server.exe')).toBeInTheDocument();
+        expect(screen.queryByText('Protection settings')).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Settings'})).not.toBeInTheDocument();
     });
 
     it('loads Dashboard resource metrics and refreshes them automatically', async () => {
@@ -238,6 +263,10 @@ describe('App layout navigation', () => {
                 totalMemoryBytes: 16 * 1024 * 1024 * 1024,
                 usedMemoryBytes: 9.5 * 1024 * 1024 * 1024,
                 freeMemoryBytes: 6.5 * 1024 * 1024 * 1024,
+                gpuPercent: 18.2,
+                totalVRAMBytes: 8 * 1024 * 1024 * 1024,
+                usedVRAMBytes: 3 * 1024 * 1024 * 1024,
+                freeVRAMBytes: 5 * 1024 * 1024 * 1024,
                 processCount: 184,
                 portCount: 37,
             })
@@ -246,6 +275,10 @@ describe('App layout navigation', () => {
                 totalMemoryBytes: 16 * 1024 * 1024 * 1024,
                 usedMemoryBytes: 8 * 1024 * 1024 * 1024,
                 freeMemoryBytes: 7.5 * 1024 * 1024 * 1024,
+                gpuPercent: 28.4,
+                totalVRAMBytes: 8 * 1024 * 1024 * 1024,
+                usedVRAMBytes: 4 * 1024 * 1024 * 1024,
+                freeVRAMBytes: 4 * 1024 * 1024 * 1024,
                 processCount: 190,
                 portCount: 42,
             });
@@ -255,9 +288,13 @@ describe('App layout navigation', () => {
         await act(async () => {});
 
         expect(screen.getAllByText('42.5%').length).toBeGreaterThan(0);
-        expect(screen.getAllByText('16.0 GB').length).toBeGreaterThan(0);
-        expect(screen.getAllByText('9.5 GB').length).toBeGreaterThan(0);
-        expect(screen.getByText('6.5 GB')).toBeInTheDocument();
+        expect(screen.getByText('9.5 GB / 16.0 GB')).toBeInTheDocument();
+        expect(screen.queryByText('Total Memory')).not.toBeInTheDocument();
+        expect(screen.queryByText('Used Memory')).not.toBeInTheDocument();
+        expect(screen.queryByText('Free Memory')).not.toBeInTheDocument();
+        expect(screen.getByText('GPU')).toBeInTheDocument();
+        expect(screen.getByText('VRAM')).toBeInTheDocument();
+        expect(screen.getByText('3.0 GB / 8.0 GB')).toBeInTheDocument();
         expect(screen.getByText('184')).toBeInTheDocument();
         expect(screen.getByText('37')).toBeInTheDocument();
 
@@ -270,7 +307,8 @@ describe('App layout navigation', () => {
 
         expect(getSystemResourceInfoMock).toHaveBeenCalledTimes(2);
         expect(screen.getAllByText('25.0%').length).toBeGreaterThan(0);
-        expect(screen.getAllByText('8.0 GB').length).toBeGreaterThan(0);
+        expect(screen.getByText('8.0 GB / 16.0 GB')).toBeInTheDocument();
+        expect(screen.getByText('4.0 GB / 8.0 GB')).toBeInTheDocument();
         expect(screen.getByText('190')).toBeInTheDocument();
         expect(screen.getByText('42')).toBeInTheDocument();
     });
@@ -283,6 +321,10 @@ describe('App layout navigation', () => {
                 totalMemoryBytes: 16 * 1024 * 1024 * 1024,
                 usedMemoryBytes: 9.5 * 1024 * 1024 * 1024,
                 freeMemoryBytes: 6.5 * 1024 * 1024 * 1024,
+                gpuPercent: 18.2,
+                totalVRAMBytes: 8 * 1024 * 1024 * 1024,
+                usedVRAMBytes: 3 * 1024 * 1024 * 1024,
+                freeVRAMBytes: 5 * 1024 * 1024 * 1024,
                 processCount: 184,
                 portCount: 37,
             })
@@ -291,6 +333,10 @@ describe('App layout navigation', () => {
                 totalMemoryBytes: 16 * 1024 * 1024 * 1024,
                 usedMemoryBytes: 8 * 1024 * 1024 * 1024,
                 freeMemoryBytes: 8 * 1024 * 1024 * 1024,
+                gpuPercent: 28.4,
+                totalVRAMBytes: 8 * 1024 * 1024 * 1024,
+                usedVRAMBytes: 4 * 1024 * 1024 * 1024,
+                freeVRAMBytes: 4 * 1024 * 1024 * 1024,
                 processCount: 190,
                 portCount: 42,
             });
@@ -302,6 +348,8 @@ describe('App layout navigation', () => {
         expect(screen.getAllByText('42.5%').length).toBeGreaterThan(0);
         expect(screen.getByLabelText('CPU usage chart')).toBeInTheDocument();
         expect(screen.getByLabelText('Memory usage chart')).toBeInTheDocument();
+        expect(screen.getByLabelText('GPU usage chart')).toBeInTheDocument();
+        expect(screen.getByLabelText('VRAM usage chart')).toBeInTheDocument();
 
         await act(async () => {
             vi.advanceTimersByTime(5000);
@@ -310,14 +358,14 @@ describe('App layout navigation', () => {
 
         expect(getSystemResourceInfoMock).toHaveBeenCalledTimes(2);
         expect(screen.getAllByText('25.0%').length).toBeGreaterThan(0);
-        expect(screen.getByText('50.0%')).toBeInTheDocument();
+        expect(screen.getAllByText('50.0%').length).toBeGreaterThanOrEqual(2);
+        expect(screen.getByText('28.4%')).toBeInTheDocument();
     });
 
     it('switches application language from Settings', async () => {
         render(<App/>);
 
         fireEvent.click(screen.getByRole('button', {name: 'Settings'}));
-        expect(await screen.findByRole('heading', {name: 'Settings'})).toBeInTheDocument();
         expect(await screen.findByText('redis-server.exe')).toBeInTheDocument();
 
         await act(async () => {
@@ -325,7 +373,7 @@ describe('App layout navigation', () => {
         });
 
         expect(screen.getByRole('button', {name: '进程'})).toBeInTheDocument();
-        expect(screen.getByRole('heading', {name: '设置'})).toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: '设置'})).not.toBeInTheDocument();
         expect(screen.getByLabelText('语言')).toHaveValue('zh');
     });
 
@@ -334,7 +382,6 @@ describe('App layout navigation', () => {
 
         fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
 
-        expect(await screen.findByRole('heading', {name: 'Processes'})).toBeInTheDocument();
         expect(await screen.findByText('node.exe')).toBeInTheDocument();
         expect(screen.getByText('System')).toBeInTheDocument();
         expect(screen.getAllByText('Protected').length).toBeGreaterThan(1);
@@ -344,8 +391,13 @@ describe('App layout navigation', () => {
 
         expect(systemRow).not.toBeNull();
         expect(nodeRow).not.toBeNull();
-        expect(within(systemRow as HTMLTableRowElement).getByRole('button', {name: 'End Process'})).toBeDisabled();
-        expect(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End Process'})).not.toBeDisabled();
+        const systemAction = within(systemRow as HTMLTableRowElement).getByRole('button', {name: 'End Process'});
+        const nodeAction = within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End Process'});
+
+        expect(systemAction.closest('td')).toHaveClass('sticky-action-column');
+        expect(nodeAction.closest('td')).toHaveClass('sticky-action-column');
+        expect(systemAction).toBeDisabled();
+        expect(nodeAction).not.toBeDisabled();
     });
 
     it('keeps long process commands visually constrained while preserving full command text', async () => {
@@ -450,7 +502,6 @@ describe('App layout navigation', () => {
 
         fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
 
-        expect(await screen.findByRole('heading', {name: 'Ports'})).toBeInTheDocument();
         expect(await screen.findByText('node.exe')).toBeInTheDocument();
         expect(screen.getByText('3000')).toBeInTheDocument();
         expect(screen.getByText('5432')).toBeInTheDocument();
@@ -461,8 +512,13 @@ describe('App layout navigation', () => {
 
         expect(nodeRow).not.toBeNull();
         expect(protectedRow).not.toBeNull();
-        expect(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End Occupancy'})).not.toBeDisabled();
-        expect(within(protectedRow as HTMLTableRowElement).getByRole('button', {name: 'End Occupancy'})).toBeDisabled();
+        const nodeAction = within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End Occupancy'});
+        const protectedAction = within(protectedRow as HTMLTableRowElement).getByRole('button', {name: 'End Occupancy'});
+
+        expect(nodeAction.closest('td')).toHaveClass('sticky-action-column');
+        expect(protectedAction.closest('td')).toHaveClass('sticky-action-column');
+        expect(nodeAction).not.toBeDisabled();
+        expect(protectedAction).toBeDisabled();
     });
 
     it('confirms before ending a port occupant and refreshes the port list', async () => {
@@ -567,8 +623,11 @@ describe('App layout navigation', () => {
 
         fireEvent.click(screen.getByRole('button', {name: 'Cleanup'}));
 
-        expect(await screen.findByRole('heading', {name: 'Cleanup'})).toBeInTheDocument();
         expect(await screen.findByText('node.exe')).toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Cleanup'})).not.toBeInTheDocument();
+        expect(screen.getByRole('toolbar', {name: 'Cleanup actions'})).toHaveClass('cleanup-toolbar');
+        expect(screen.getByText('Candidates')).toBeInTheDocument();
+        expect(screen.getByText('Selected')).toBeInTheDocument();
         expect(screen.getByText('postgres.exe')).toBeInTheDocument();
         expect(screen.getByText('vmmem')).toBeInTheDocument();
         expect(screen.queryByText('chrome.exe')).not.toBeInTheDocument();
@@ -628,7 +687,6 @@ describe('App layout navigation', () => {
 
         fireEvent.click(screen.getByRole('button', {name: 'Settings'}));
 
-        expect(await screen.findByRole('heading', {name: 'Settings'})).toBeInTheDocument();
         expect(await screen.findByText('System')).toBeInTheDocument();
         expect(screen.getByText('svchost.exe')).toBeInTheDocument();
         expect(screen.getByText('redis-server.exe')).toBeInTheDocument();
@@ -678,7 +736,7 @@ describe('App layout navigation', () => {
         fireEvent.click(screen.getByRole('button', {name: 'Logs'}));
 
         await act(async () => {});
-        expect(screen.getByRole('heading', {name: 'Logs'})).toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Logs'})).not.toBeInTheDocument();
         expect(screen.getByText('No operation logs found.')).toBeInTheDocument();
         expect(screen.queryByRole('button', {name: 'Refresh Logs'})).not.toBeInTheDocument();
 

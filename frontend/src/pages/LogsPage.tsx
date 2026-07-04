@@ -46,15 +46,7 @@ function LogsPage({page, t}: LogsPageProps) {
     }, [loadLogs]);
 
     return (
-        <section className="page-panel process-page" aria-labelledby={`${page.id}-title`}>
-            <div className="page-header compact-page-header">
-                <div>
-                    <p className="eyebrow">{page.eyebrow}</p>
-                    <h1 id={`${page.id}-title`}>{page.title}</h1>
-                    <p className="page-description">{page.description}</p>
-                </div>
-            </div>
-
+        <section className="page-panel process-page" aria-label={page.title}>
             {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}
             {isLoading && logs.length === 0 && (
                 <StatusMessage variant="loading">{t('logs.loading')}</StatusMessage>

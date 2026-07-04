@@ -112,15 +112,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
     const emptyMessage = isFiltered ? t('processes.emptyFiltered') : t('processes.empty');
 
     return (
-        <section className="page-panel process-page" aria-labelledby={`${page.id}-title`}>
-            <div className="page-header compact-page-header">
-                <div>
-                    <p className="eyebrow">{page.eyebrow}</p>
-                    <h1 id={`${page.id}-title`}>{page.title}</h1>
-                    <p className="page-description">{page.description}</p>
-                </div>
-            </div>
-
+        <section className="page-panel process-page" aria-label={page.title}>
             <div className="process-toolbar compact-toolbar">
                 <label className="filter-field">
                     <span>{t('filter.processName')}</span>
@@ -184,7 +176,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                 <th>{t('field.memory')}</th>
                                 <th>{t('field.user')}</th>
                                 <th>{t('field.protected')}</th>
-                                <th>{t('field.action')}</th>
+                                <th className="sticky-action-column">{t('field.action')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -213,7 +205,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                                 {process.isProtected ? t('badge.protected') : t('badge.standard')}
                                             </span>
                                         </td>
-                                        <td>
+                                        <td className="sticky-action-column">
                                             <button
                                                 className="danger-button table-action-button"
                                                 type="button"
