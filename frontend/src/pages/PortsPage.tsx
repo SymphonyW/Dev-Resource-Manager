@@ -103,7 +103,7 @@ function PortsPage({page}: PortsPageProps) {
         <section className="page-panel process-page" aria-labelledby={`${page.id}-title`}>
             <div className="page-header">
                 <div>
-                    <p className="eyebrow">Port monitor</p>
+                    <p className="eyebrow">{page.eyebrow}</p>
                     <h1 id={`${page.id}-title`}>{page.title}</h1>
                     <p className="page-description">{page.description}</p>
                 </div>

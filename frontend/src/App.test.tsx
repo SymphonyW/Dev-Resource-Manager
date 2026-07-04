@@ -1,5 +1,5 @@
-import {fireEvent, render, screen, waitFor, within} from '@testing-library/react';
-import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {act, fireEvent, render, screen, waitFor, within} from '@testing-library/react';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import App from './App';
 
 const getSystemResourceInfoMock = vi.fn();
@@ -155,7 +155,13 @@ const operationLogs = [
 ];
 
 describe('App layout navigation', () => {
+    afterEach(() => {
+        vi.useRealTimers();
+        window.localStorage.clear();
+    });
+
     beforeEach(() => {
+        window.localStorage.clear();
         getSystemResourceInfoMock.mockReset();
         getSystemResourceInfoMock.mockResolvedValue({
             cpuPercent: 42.5,
@@ -243,9 +249,9 @@ describe('App layout navigation', () => {
 
         render(<App/>);
 
-        expect(await screen.findByText('42.5%')).toBeInTheDocument();
-        expect(screen.getByText('16.0 GB')).toBeInTheDocument();
-        expect(screen.getByText('9.5 GB')).toBeInTheDocument();
+        expect((await screen.findAllByText('42.5%')).length).toBeGreaterThan(0);
+        expect(screen.getAllByText('16.0 GB').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('9.5 GB').length).toBeGreaterThan(0);
         expect(screen.getByText('6.5 GB')).toBeInTheDocument();
         expect(screen.getByText('184')).toBeInTheDocument();
         expect(screen.getByText('37')).toBeInTheDocument();
@@ -253,10 +259,61 @@ describe('App layout navigation', () => {
         fireEvent.click(screen.getByRole('button', {name: 'Refresh'}));
 
         await waitFor(() => expect(getSystemResourceInfoMock).toHaveBeenCalledTimes(2));
-        expect(await screen.findByText('25.0%')).toBeInTheDocument();
-        expect(screen.getByText('8.0 GB')).toBeInTheDocument();
+        expect((await screen.findAllByText('25.0%')).length).toBeGreaterThan(0);
+        expect(screen.getAllByText('8.0 GB').length).toBeGreaterThan(0);
         expect(screen.getByText('190')).toBeInTheDocument();
         expect(screen.getByText('42')).toBeInTheDocument();
+    });
+
+    it('renders Dashboard resource charts and updates them on an interval', async () => {
+        vi.useFakeTimers();
+        getSystemResourceInfoMock
+            .mockResolvedValueOnce({
+                cpuPercent: 42.5,
+                totalMemoryBytes: 16 * 1024 * 1024 * 1024,
+                usedMemoryBytes: 9.5 * 1024 * 1024 * 1024,
+                freeMemoryBytes: 6.5 * 1024 * 1024 * 1024,
+                processCount: 184,
+                portCount: 37,
+            })
+            .mockResolvedValueOnce({
+                cpuPercent: 25,
+                totalMemoryBytes: 16 * 1024 * 1024 * 1024,
+                usedMemoryBytes: 8 * 1024 * 1024 * 1024,
+                freeMemoryBytes: 8 * 1024 * 1024 * 1024,
+                processCount: 190,
+                portCount: 42,
+            });
+
+        render(<App/>);
+
+        await act(async () => {});
+
+        expect(screen.getAllByText('42.5%').length).toBeGreaterThan(0);
+        expect(screen.getByLabelText('CPU usage chart')).toBeInTheDocument();
+        expect(screen.getByLabelText('Memory usage chart')).toBeInTheDocument();
+
+        await act(async () => {
+            vi.advanceTimersByTime(5000);
+        });
+        await act(async () => {});
+
+        expect(getSystemResourceInfoMock).toHaveBeenCalledTimes(2);
+        expect(screen.getAllByText('25.0%').length).toBeGreaterThan(0);
+        expect(screen.getByText('50.0%')).toBeInTheDocument();
+    });
+
+    it('switches application language from Settings', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Settings'}));
+        expect(await screen.findByRole('heading', {name: 'Settings'})).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Language'), {target: {value: 'zh'}});
+
+        expect(screen.getByRole('button', {name: '进程'})).toBeInTheDocument();
+        expect(screen.getByRole('heading', {name: '设置'})).toBeInTheDocument();
+        expect(screen.getByLabelText('语言')).toHaveValue('zh');
     });
 
     it('loads Processes into a table with protected markers and protected actions disabled', async () => {
@@ -276,6 +333,19 @@ describe('App layout navigation', () => {
         expect(nodeRow).not.toBeNull();
         expect(within(systemRow as HTMLTableRowElement).getByRole('button', {name: '结束进程'})).toBeDisabled();
         expect(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: '结束进程'})).not.toBeDisabled();
+    });
+
+    it('keeps long process commands visually constrained while preserving full command text', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+
+        const nodeRow = screen.getByText('node.exe').closest('tr');
+        expect(nodeRow).not.toBeNull();
+        const commandCell = within(nodeRow as HTMLTableRowElement).getByText('node server.js');
+        expect(commandCell).toHaveClass('command-cell');
+        expect(commandCell).toHaveAttribute('title', 'node server.js');
     });
 
     it('filters Processes by name and PID', async () => {
