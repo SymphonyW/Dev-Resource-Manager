@@ -1,20 +1,26 @@
 import {useCallback, useEffect, useState} from 'react';
 import StatusMessage from '../components/StatusMessage';
 import {loadOperationLogs} from '../services/logs';
+import type {Translator} from '../services/i18n';
 import type {OperationLog} from '../types/logs';
 import type {PageDefinition} from '../types/navigation';
 
+const logRefreshIntervalMs = 5000;
+
 interface LogsPageProps {
     page: PageDefinition;
+    t: Translator;
 }
 
-function LogsPage({page}: LogsPageProps) {
+function LogsPage({page, t}: LogsPageProps) {
     const [logs, setLogs] = useState<OperationLog[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
-    const loadLogs = useCallback(async () => {
-        setIsLoading(true);
+    const loadLogs = useCallback(async (showLoading = true) => {
+        if (showLoading) {
+            setIsLoading(true);
+        }
         setErrorMessage('');
 
         try {
@@ -22,57 +28,55 @@ function LogsPage({page}: LogsPageProps) {
             setLogs(nextLogs);
         } catch {
             setLogs([]);
-            setErrorMessage('Unable to load operation logs.');
+            setErrorMessage(t('logs.error'));
         } finally {
-            setIsLoading(false);
+            if (showLoading) {
+                setIsLoading(false);
+            }
         }
-    }, []);
+    }, [t]);
 
     useEffect(() => {
-        void loadLogs();
+        void loadLogs(true);
+        const intervalId = window.setInterval(() => {
+            void loadLogs(false);
+        }, logRefreshIntervalMs);
+
+        return () => window.clearInterval(intervalId);
     }, [loadLogs]);
 
     return (
         <section className="page-panel process-page" aria-labelledby={`${page.id}-title`}>
-            <div className="page-header">
+            <div className="page-header compact-page-header">
                 <div>
-                    <p className="eyebrow">Operation history</p>
+                    <p className="eyebrow">{page.eyebrow}</p>
                     <h1 id={`${page.id}-title`}>{page.title}</h1>
                     <p className="page-description">{page.description}</p>
                 </div>
-                <button
-                    aria-label="Refresh Logs"
-                    className="refresh-button"
-                    type="button"
-                    onClick={loadLogs}
-                    disabled={isLoading}
-                >
-                    Refresh
-                </button>
             </div>
 
             {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}
             {isLoading && logs.length === 0 && (
-                <StatusMessage variant="loading">Loading operation logs...</StatusMessage>
+                <StatusMessage variant="loading">{t('logs.loading')}</StatusMessage>
             )}
 
             {!isLoading && !errorMessage && logs.length === 0 && (
-                <StatusMessage variant="empty">No operation logs found.</StatusMessage>
+                <StatusMessage variant="empty">{t('logs.empty')}</StatusMessage>
             )}
 
             {logs.length > 0 && (
-                <div className="process-table-wrap">
-                    <table className="process-table logs-table" aria-label="Operation log list">
+                <div className="process-table-wrap compact-table-wrap">
+                    <table className="process-table logs-table compact-data-table" aria-label={t('table.logsList')}>
                         <thead>
                             <tr>
-                                <th>ID</th>
-                                <th>Action</th>
-                                <th>PID</th>
-                                <th>Process Name</th>
-                                <th>Port</th>
-                                <th>Result</th>
-                                <th>Message</th>
-                                <th>Created At</th>
+                                <th>{t('field.id')}</th>
+                                <th>{t('field.action')}</th>
+                                <th>{t('field.pid')}</th>
+                                <th>{t('field.processName')}</th>
+                                <th>{t('field.port')}</th>
+                                <th>{t('field.result')}</th>
+                                <th>{t('field.message')}</th>
+                                <th>{t('field.createdAt')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -80,16 +84,16 @@ function LogsPage({page}: LogsPageProps) {
                                 <tr key={log.id}>
                                     <td className="mono">{log.id}</td>
                                     <td className="mono" data-testid="operation-log-action">{log.action}</td>
-                                    <td className="mono">{log.pid || 'N/A'}</td>
-                                    <td>{log.processName || 'Unavailable'}</td>
-                                    <td className="mono">{log.port || 'N/A'}</td>
+                                    <td className="mono">{log.pid || t('common.notApplicable')}</td>
+                                    <td>{log.processName || t('common.unavailable')}</td>
+                                    <td className="mono">{log.port || t('common.notApplicable')}</td>
                                     <td>
                                         <span className={log.result === 'success' ? 'result-badge success' : 'result-badge failure'}>
-                                            {log.result}
+                                            {log.result === 'success' ? t('operation.succeeded') : t('operation.failed')}
                                         </span>
                                     </td>
-                                    <td className="muted-cell">{log.message || 'Unavailable'}</td>
-                                    <td className="mono">{formatCreatedAt(log.createdAt)}</td>
+                                    <td className="muted-cell">{log.message || t('common.unavailable')}</td>
+                                    <td className="mono">{formatCreatedAt(log.createdAt) || t('common.unavailable')}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -103,7 +107,7 @@ function LogsPage({page}: LogsPageProps) {
 function formatCreatedAt(value: string): string {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
-        return value || 'Unavailable';
+        return value;
     }
 
     return date.toLocaleString();

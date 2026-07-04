@@ -1,5 +1,5 @@
-import {fireEvent, render, screen, waitFor, within} from '@testing-library/react';
-import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {act, fireEvent, render, screen, waitFor, within} from '@testing-library/react';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import App from './App';
 
 const getSystemResourceInfoMock = vi.fn();
@@ -155,7 +155,13 @@ const operationLogs = [
 ];
 
 describe('App layout navigation', () => {
+    afterEach(() => {
+        vi.useRealTimers();
+        window.localStorage.clear();
+    });
+
     beforeEach(() => {
+        window.localStorage.clear();
         getSystemResourceInfoMock.mockReset();
         getSystemResourceInfoMock.mockResolvedValue({
             cpuPercent: 42.5,
@@ -202,6 +208,8 @@ describe('App layout navigation', () => {
     it('renders all primary navigation pages and highlights Dashboard by default', async () => {
         render(<App/>);
 
+        expect(screen.queryByText('Desktop')).not.toBeInTheDocument();
+        expect(screen.queryByText('Dev Resource Manager')).not.toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'Dashboard'})).toHaveAttribute('aria-current', 'page');
         expect(screen.getByRole('button', {name: 'Processes'})).toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'Ports'})).toBeInTheDocument();
@@ -218,11 +226,12 @@ describe('App layout navigation', () => {
 
         expect(screen.getByRole('button', {name: 'Ports'})).toHaveAttribute('aria-current', 'page');
         expect(screen.getByRole('heading', {name: 'Ports'})).toBeInTheDocument();
-        expect(screen.getByText('Review local TCP and UDP port usage and the owning process.')).toBeInTheDocument();
+        expect(screen.getByText('Review local TCP and UDP ports and the owning process.')).toBeInTheDocument();
         expect(await screen.findByText('node.exe')).toBeInTheDocument();
     });
 
-    it('loads Dashboard resource metrics and refreshes them on demand', async () => {
+    it('loads Dashboard resource metrics and refreshes them automatically', async () => {
+        vi.useFakeTimers();
         getSystemResourceInfoMock
             .mockResolvedValueOnce({
                 cpuPercent: 42.5,
@@ -243,20 +252,81 @@ describe('App layout navigation', () => {
 
         render(<App/>);
 
-        expect(await screen.findByText('42.5%')).toBeInTheDocument();
-        expect(screen.getByText('16.0 GB')).toBeInTheDocument();
-        expect(screen.getByText('9.5 GB')).toBeInTheDocument();
+        await act(async () => {});
+
+        expect(screen.getAllByText('42.5%').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('16.0 GB').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('9.5 GB').length).toBeGreaterThan(0);
         expect(screen.getByText('6.5 GB')).toBeInTheDocument();
         expect(screen.getByText('184')).toBeInTheDocument();
         expect(screen.getByText('37')).toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole('button', {name: 'Refresh'}));
+        expect(screen.queryByRole('button', {name: 'Refresh'})).not.toBeInTheDocument();
 
-        await waitFor(() => expect(getSystemResourceInfoMock).toHaveBeenCalledTimes(2));
-        expect(await screen.findByText('25.0%')).toBeInTheDocument();
-        expect(screen.getByText('8.0 GB')).toBeInTheDocument();
+        await act(async () => {
+            vi.advanceTimersByTime(5000);
+        });
+        await act(async () => {});
+
+        expect(getSystemResourceInfoMock).toHaveBeenCalledTimes(2);
+        expect(screen.getAllByText('25.0%').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('8.0 GB').length).toBeGreaterThan(0);
         expect(screen.getByText('190')).toBeInTheDocument();
         expect(screen.getByText('42')).toBeInTheDocument();
+    });
+
+    it('renders Dashboard resource charts and updates them on an interval', async () => {
+        vi.useFakeTimers();
+        getSystemResourceInfoMock
+            .mockResolvedValueOnce({
+                cpuPercent: 42.5,
+                totalMemoryBytes: 16 * 1024 * 1024 * 1024,
+                usedMemoryBytes: 9.5 * 1024 * 1024 * 1024,
+                freeMemoryBytes: 6.5 * 1024 * 1024 * 1024,
+                processCount: 184,
+                portCount: 37,
+            })
+            .mockResolvedValueOnce({
+                cpuPercent: 25,
+                totalMemoryBytes: 16 * 1024 * 1024 * 1024,
+                usedMemoryBytes: 8 * 1024 * 1024 * 1024,
+                freeMemoryBytes: 8 * 1024 * 1024 * 1024,
+                processCount: 190,
+                portCount: 42,
+            });
+
+        render(<App/>);
+
+        await act(async () => {});
+
+        expect(screen.getAllByText('42.5%').length).toBeGreaterThan(0);
+        expect(screen.getByLabelText('CPU usage chart')).toBeInTheDocument();
+        expect(screen.getByLabelText('Memory usage chart')).toBeInTheDocument();
+
+        await act(async () => {
+            vi.advanceTimersByTime(5000);
+        });
+        await act(async () => {});
+
+        expect(getSystemResourceInfoMock).toHaveBeenCalledTimes(2);
+        expect(screen.getAllByText('25.0%').length).toBeGreaterThan(0);
+        expect(screen.getByText('50.0%')).toBeInTheDocument();
+    });
+
+    it('switches application language from Settings', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Settings'}));
+        expect(await screen.findByRole('heading', {name: 'Settings'})).toBeInTheDocument();
+        expect(await screen.findByText('redis-server.exe')).toBeInTheDocument();
+
+        await act(async () => {
+            fireEvent.change(screen.getByLabelText('Language'), {target: {value: 'zh'}});
+        });
+
+        expect(screen.getByRole('button', {name: '进程'})).toBeInTheDocument();
+        expect(screen.getByRole('heading', {name: '设置'})).toBeInTheDocument();
+        expect(screen.getByLabelText('语言')).toHaveValue('zh');
     });
 
     it('loads Processes into a table with protected markers and protected actions disabled', async () => {
@@ -274,8 +344,21 @@ describe('App layout navigation', () => {
 
         expect(systemRow).not.toBeNull();
         expect(nodeRow).not.toBeNull();
-        expect(within(systemRow as HTMLTableRowElement).getByRole('button', {name: '结束进程'})).toBeDisabled();
-        expect(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: '结束进程'})).not.toBeDisabled();
+        expect(within(systemRow as HTMLTableRowElement).getByRole('button', {name: 'End Process'})).toBeDisabled();
+        expect(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End Process'})).not.toBeDisabled();
+    });
+
+    it('keeps long process commands visually constrained while preserving full command text', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+
+        const nodeRow = screen.getByText('node.exe').closest('tr');
+        expect(nodeRow).not.toBeNull();
+        const commandCell = within(nodeRow as HTMLTableRowElement).getByText('node server.js');
+        expect(commandCell).toHaveClass('command-cell');
+        expect(commandCell).toHaveAttribute('title', 'node server.js');
     });
 
     it('filters Processes by name and PID', async () => {
@@ -284,12 +367,12 @@ describe('App layout navigation', () => {
         fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
         expect(await screen.findByText('node.exe')).toBeInTheDocument();
 
-        fireEvent.change(screen.getByLabelText('Search by process name'), {target: {value: 'node'}});
+        fireEvent.change(screen.getByLabelText('Process name'), {target: {value: 'node'}});
         expect(screen.getByText('node.exe')).toBeInTheDocument();
         expect(screen.queryByText('postgres.exe')).not.toBeInTheDocument();
 
-        fireEvent.change(screen.getByLabelText('Search by process name'), {target: {value: ''}});
-        fireEvent.change(screen.getByLabelText('Search by PID'), {target: {value: '200'}});
+        fireEvent.change(screen.getByLabelText('Process name'), {target: {value: ''}});
+        fireEvent.change(screen.getByLabelText('PID'), {target: {value: '200'}});
         expect(screen.getByText('postgres.exe')).toBeInTheDocument();
         expect(screen.queryByText('node.exe')).not.toBeInTheDocument();
     });
@@ -300,14 +383,15 @@ describe('App layout navigation', () => {
         fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
         expect(await screen.findByText('node.exe')).toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole('button', {name: 'Sort by Memory'}));
+        fireEvent.click(screen.getByRole('button', {name: 'Memory'}));
         expect(screen.getAllByTestId('process-name')[0]).toHaveTextContent('postgres.exe');
 
-        fireEvent.click(screen.getByRole('button', {name: 'Sort by CPU'}));
+        fireEvent.click(screen.getByRole('button', {name: 'CPU'}));
         expect(screen.getAllByTestId('process-name')[0]).toHaveTextContent('node.exe');
     });
 
-    it('refreshes Processes and handles empty and error states', async () => {
+    it('auto refreshes Processes and handles empty and error states', async () => {
+        vi.useFakeTimers();
         getProcessListMock
             .mockResolvedValueOnce(processRows)
             .mockResolvedValueOnce([])
@@ -316,13 +400,21 @@ describe('App layout navigation', () => {
         render(<App/>);
 
         fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
-        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+        await act(async () => {});
+        expect(screen.getByText('node.exe')).toBeInTheDocument();
+        expect(screen.queryByRole('button', {name: 'Refresh Processes'})).not.toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole('button', {name: 'Refresh Processes'}));
-        expect(await screen.findByText('No processes found.')).toBeInTheDocument();
+        await act(async () => {
+            vi.advanceTimersByTime(5000);
+        });
+        await act(async () => {});
+        expect(screen.getByText('No processes found.')).toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole('button', {name: 'Refresh Processes'}));
-        expect(await screen.findByText('Unable to load process list.')).toBeInTheDocument();
+        await act(async () => {
+            vi.advanceTimersByTime(5000);
+        });
+        await act(async () => {});
+        expect(screen.getByText('Unable to load process list.')).toBeInTheDocument();
     });
 
     it('confirms before ending a process and shows operation result', async () => {
@@ -337,7 +429,7 @@ describe('App layout navigation', () => {
 
         const nodeRow = screen.getByText('node.exe').closest('tr');
         expect(nodeRow).not.toBeNull();
-        fireEvent.click(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: '结束进程'}));
+        fireEvent.click(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End Process'}));
 
         const dialog = screen.getByRole('dialog', {name: 'Confirm process termination'});
         expect(within(dialog).getByText('PID')).toBeInTheDocument();
@@ -369,8 +461,8 @@ describe('App layout navigation', () => {
 
         expect(nodeRow).not.toBeNull();
         expect(protectedRow).not.toBeNull();
-        expect(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End port occupancy'})).not.toBeDisabled();
-        expect(within(protectedRow as HTMLTableRowElement).getByRole('button', {name: 'End port occupancy'})).toBeDisabled();
+        expect(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End Occupancy'})).not.toBeDisabled();
+        expect(within(protectedRow as HTMLTableRowElement).getByRole('button', {name: 'End Occupancy'})).toBeDisabled();
     });
 
     it('confirms before ending a port occupant and refreshes the port list', async () => {
@@ -385,7 +477,7 @@ describe('App layout navigation', () => {
 
         const nodeRow = screen.getByText('node.exe').closest('tr');
         expect(nodeRow).not.toBeNull();
-        fireEvent.click(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End port occupancy'}));
+        fireEvent.click(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End Occupancy'}));
 
         const dialog = screen.getByRole('dialog', {name: 'Confirm port occupancy termination'});
         expect(within(dialog).getByText('Port')).toBeInTheDocument();
@@ -409,12 +501,12 @@ describe('App layout navigation', () => {
         fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
         expect(await screen.findByText('node.exe')).toBeInTheDocument();
 
-        fireEvent.change(screen.getByLabelText('Search by port number'), {target: {value: '5432'}});
+        fireEvent.change(screen.getByLabelText('Port'), {target: {value: '5432'}});
         expect(screen.getByText('postgres.exe')).toBeInTheDocument();
         expect(screen.queryByText('node.exe')).not.toBeInTheDocument();
 
-        fireEvent.change(screen.getByLabelText('Search by port number'), {target: {value: ''}});
-        fireEvent.change(screen.getByLabelText('Search by process name'), {target: {value: 'custom'}});
+        fireEvent.change(screen.getByLabelText('Port'), {target: {value: ''}});
+        fireEvent.change(screen.getByLabelText('Process name'), {target: {value: 'custom'}});
         expect(screen.getByText('custom-api.exe')).toBeInTheDocument();
         expect(screen.queryByText('postgres.exe')).not.toBeInTheDocument();
     });
@@ -425,17 +517,18 @@ describe('App layout navigation', () => {
         fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
         expect(await screen.findByText('dns-sd.exe')).toBeInTheDocument();
 
-        fireEvent.change(screen.getByLabelText('Filter by protocol'), {target: {value: 'UDP'}});
+        fireEvent.change(screen.getByLabelText('Protocol'), {target: {value: 'UDP'}});
         expect(screen.getByText('dns-sd.exe')).toBeInTheDocument();
         expect(screen.queryByText('node.exe')).not.toBeInTheDocument();
 
-        fireEvent.change(screen.getByLabelText('Filter by protocol'), {target: {value: 'all'}});
-        fireEvent.change(screen.getByLabelText('Filter by status'), {target: {value: 'ESTABLISHED'}});
+        fireEvent.change(screen.getByLabelText('Protocol'), {target: {value: 'all'}});
+        fireEvent.change(screen.getByLabelText('Status'), {target: {value: 'ESTABLISHED'}});
         expect(screen.getByText('custom-api.exe')).toBeInTheDocument();
         expect(screen.queryByText('postgres.exe')).not.toBeInTheDocument();
     });
 
-    it('refreshes Ports and handles loading empty and error states', async () => {
+    it('auto refreshes Ports and handles loading empty and error states', async () => {
+        vi.useFakeTimers();
         let resolveInitialPorts: (value: typeof portRows) => void = () => {};
         getPortListMock
             .mockReturnValueOnce(new Promise<typeof portRows>((resolve) => {
@@ -447,16 +540,26 @@ describe('App layout navigation', () => {
         render(<App/>);
 
         fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
-        expect(await screen.findByText('Loading port list...')).toBeInTheDocument();
+        await act(async () => {});
+        expect(screen.getByText('Loading port list...')).toBeInTheDocument();
 
-        resolveInitialPorts(portRows);
-        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+        await act(async () => {
+            resolveInitialPorts(portRows);
+        });
+        expect(screen.getByText('node.exe')).toBeInTheDocument();
+        expect(screen.queryByRole('button', {name: 'Refresh Ports'})).not.toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole('button', {name: 'Refresh Ports'}));
-        expect(await screen.findByText('No ports found.')).toBeInTheDocument();
+        await act(async () => {
+            vi.advanceTimersByTime(5000);
+        });
+        await act(async () => {});
+        expect(screen.getByText('No ports found.')).toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole('button', {name: 'Refresh Ports'}));
-        expect(await screen.findByText('Unable to load port list.')).toBeInTheDocument();
+        await act(async () => {
+            vi.advanceTimersByTime(5000);
+        });
+        await act(async () => {});
+        expect(screen.getByText('Unable to load port list.')).toBeInTheDocument();
     });
 
     it('loads Cleanup candidates with ports and keeps protected processes unselectable', async () => {
@@ -516,8 +619,8 @@ describe('App layout navigation', () => {
         await waitFor(() => expect(killProcessByPIDMock).toHaveBeenCalledWith(100));
         await waitFor(() => expect(killProcessByPIDMock).toHaveBeenCalledWith(200));
         expect(await screen.findByText('2 cleanup operations finished. 2 succeeded, 0 failed.')).toBeInTheDocument();
-        await waitFor(() => expect(getProcessListMock).toHaveBeenCalledTimes(2));
-        await waitFor(() => expect(getPortListMock).toHaveBeenCalledTimes(2));
+        await waitFor(() => expect(getProcessListMock.mock.calls.length).toBeGreaterThanOrEqual(2));
+        await waitFor(() => expect(getPortListMock.mock.calls.length).toBeGreaterThanOrEqual(2));
     });
 
     it('loads Settings protection lists and keeps default entries read-only', async () => {
@@ -530,8 +633,8 @@ describe('App layout navigation', () => {
         expect(screen.getByText('svchost.exe')).toBeInTheDocument();
         expect(screen.getByText('redis-server.exe')).toBeInTheDocument();
 
-        const defaultList = screen.getByLabelText('Default protected process list');
-        const customList = screen.getByLabelText('Custom protected process list');
+        const defaultList = screen.getByRole('list', {name: 'Default protected processes'});
+        const customList = screen.getByRole('list', {name: 'Custom protected processes'});
 
         expect(within(defaultList).queryByRole('button', {name: /delete/i})).not.toBeInTheDocument();
         expect(within(customList).getByRole('button', {name: 'Delete redis-server.exe'})).toBeInTheDocument();
@@ -564,7 +667,8 @@ describe('App layout navigation', () => {
         expect(screen.getByText('Custom protected process removed.')).toBeInTheDocument();
     });
 
-    it('loads Logs in newest-first order and refreshes them', async () => {
+    it('loads Logs in newest-first order and refreshes them automatically', async () => {
+        vi.useFakeTimers();
         getOperationLogsMock
             .mockResolvedValueOnce([])
             .mockResolvedValueOnce(operationLogs);
@@ -573,16 +677,21 @@ describe('App layout navigation', () => {
 
         fireEvent.click(screen.getByRole('button', {name: 'Logs'}));
 
-        expect(await screen.findByRole('heading', {name: 'Logs'})).toBeInTheDocument();
-        expect(await screen.findByText('No operation logs found.')).toBeInTheDocument();
+        await act(async () => {});
+        expect(screen.getByRole('heading', {name: 'Logs'})).toBeInTheDocument();
+        expect(screen.getByText('No operation logs found.')).toBeInTheDocument();
+        expect(screen.queryByRole('button', {name: 'Refresh Logs'})).not.toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole('button', {name: 'Refresh Logs'}));
+        await act(async () => {
+            vi.advanceTimersByTime(5000);
+        });
+        await act(async () => {});
 
-        expect(await screen.findByText('kill_process_by_port')).toBeInTheDocument();
+        expect(screen.getByText('kill_process_by_port')).toBeInTheDocument();
         expect(screen.getByText('kill_process_by_pid')).toBeInTheDocument();
         expect(screen.getByText('Process node.exe (PID 100) ended for TCP port 3000.')).toBeInTheDocument();
         expect(screen.getByText('PID -1 is invalid.')).toBeInTheDocument();
         expect(screen.getAllByTestId('operation-log-action')[0]).toHaveTextContent('kill_process_by_port');
-        await waitFor(() => expect(getOperationLogsMock).toHaveBeenCalledTimes(2));
+        expect(getOperationLogsMock).toHaveBeenCalledTimes(2);
     });
 });
