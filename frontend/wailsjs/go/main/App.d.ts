@@ -4,6 +4,7 @@ import {config} from '../models';
 import {port} from '../models';
 import {process} from '../models';
 import {main} from '../models';
+import type {ProcessDetail} from '../../../src/types/processes';
 
 export function AddCustomProtectedProcessName(arg1:string):Promise<config.ProtectionSettings>;
 
@@ -14,6 +15,8 @@ export function DeleteCustomProtectedProcessName(arg1:string):Promise<config.Pro
 export function GetOperationLogs():Promise<Array<config.OperationLog>>;
 
 export function GetPortList():Promise<Array<port.Info>>;
+
+export function GetProcessDetail(arg1:number):Promise<ProcessDetail>;
 
 export function GetProcessList():Promise<Array<process.Info>>;
 

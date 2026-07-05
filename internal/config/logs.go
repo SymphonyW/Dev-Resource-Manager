@@ -106,3 +106,52 @@ ORDER BY created_at DESC, id DESC;`)
 
 	return logs, nil
 }
+
+// GetRecentOperationLogsForProcess returns recent logs related to a process PID or process name.
+func (s *Store) GetRecentOperationLogsForProcess(ctx context.Context, pid int, processName string, limit int) ([]OperationLog, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := s.validate(); err != nil {
+		return nil, err
+	}
+
+	normalizedName := strings.TrimSpace(processName)
+	if limit <= 0 {
+		limit = 8
+	}
+
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id, action, pid, process_name, port, result, message, created_at
+FROM operation_logs
+WHERE pid = ? OR (? <> '' AND lower(process_name) = lower(?))
+ORDER BY created_at DESC, id DESC
+LIMIT ?;`, pid, normalizedName, normalizedName, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list process operation logs: %w", err)
+	}
+	defer rows.Close()
+
+	logs := make([]OperationLog, 0)
+	for rows.Next() {
+		var log OperationLog
+		if err := rows.Scan(
+			&log.ID,
+			&log.Action,
+			&log.PID,
+			&log.ProcessName,
+			&log.Port,
+			&log.Result,
+			&log.Message,
+			&log.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("read process operation log: %w", err)
+		}
+		logs = append(logs, log)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list process operation logs: %w", err)
+	}
+
+	return logs, nil
+}
