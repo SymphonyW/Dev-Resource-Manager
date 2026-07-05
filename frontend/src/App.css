@@ -566,9 +566,12 @@ h1 {
 }
 
 .process-list-table th:nth-child(5),
-.process-list-table th:nth-child(8),
-.process-list-table th:nth-child(9) {
+.process-list-table th:nth-child(8) {
     width: 86px;
+}
+
+.process-list-table th:nth-child(9) {
+    width: 154px;
 }
 
 .process-list-table th:nth-child(6) {
@@ -666,9 +669,9 @@ h1 {
     position: sticky;
     right: 0;
     z-index: 2;
-    width: 102px;
-    min-width: 102px;
-    max-width: 102px;
+    width: 154px;
+    min-width: 154px;
+    max-width: 154px;
     box-shadow: -10px 0 16px rgba(37, 99, 235, 0.08);
     text-align: center;
     vertical-align: middle;
@@ -858,6 +861,13 @@ h1 {
     padding-inline: 10px;
 }
 
+.row-action-stack {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
 .modal-backdrop {
     position: fixed;
     inset: 0;
@@ -948,6 +958,167 @@ h1 {
     justify-content: flex-end;
     gap: 10px;
     margin-top: 20px;
+}
+
+.process-detail-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 9;
+    display: flex;
+    justify-content: flex-end;
+    background: rgba(15, 23, 42, 0.16);
+}
+
+.process-detail-drawer {
+    display: flex;
+    flex-direction: column;
+    width: min(460px, 100vw);
+    height: 100vh;
+    min-height: 0;
+    border-left: 1px solid var(--border);
+    background: var(--surface);
+    box-shadow: -18px 0 44px rgba(15, 23, 42, 0.16);
+    overflow: hidden;
+}
+
+.detail-drawer-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    border-bottom: 1px solid var(--border);
+    padding: 18px;
+}
+
+.detail-drawer-header h2 {
+    margin: 3px 0 0;
+    color: var(--text);
+    font-size: 18px;
+    line-height: 1.25;
+}
+
+.detail-drawer-kicker {
+    margin: 0;
+    color: var(--text-soft);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.detail-drawer-body {
+    min-height: 0;
+    overflow-y: auto;
+    padding: 16px 18px 20px;
+}
+
+.process-detail-drawer .status-message {
+    margin: 14px 18px;
+}
+
+.detail-badge-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.detail-field-list {
+    display: grid;
+    gap: 0;
+    margin: 0;
+    border-top: 1px solid var(--border);
+}
+
+.detail-field-list div {
+    display: grid;
+    grid-template-columns: 132px minmax(0, 1fr);
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 0;
+}
+
+.detail-field-list dt,
+.detail-section-header h3 {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.detail-field-list dd {
+    margin: 0;
+    color: #223047;
+    font-size: 13px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.detail-section {
+    border-top: 1px solid var(--border);
+    margin-top: 16px;
+    padding-top: 14px;
+}
+
+.detail-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.detail-port-list,
+.detail-log-list {
+    display: grid;
+    gap: 8px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.detail-port-list li {
+    display: grid;
+    grid-template-columns: 70px 70px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    min-height: 34px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+}
+
+.detail-log-list li {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+}
+
+.detail-log-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.detail-log-list p,
+.detail-empty,
+.detail-inline-warning {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.detail-inline-warning {
+    color: var(--danger);
+}
+
+.detail-actions {
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid var(--border);
+    margin-top: 18px;
+    padding-top: 14px;
 }
 
 .settings-grid {
@@ -1108,6 +1279,19 @@ h1 {
     }
 
     .confirmation-details div {
+        grid-template-columns: 1fr;
+    }
+
+    .row-action-stack {
+        flex-direction: column;
+    }
+
+    .process-detail-drawer {
+        width: 100vw;
+    }
+
+    .detail-field-list div,
+    .detail-port-list li {
         grid-template-columns: 1fr;
     }
 }

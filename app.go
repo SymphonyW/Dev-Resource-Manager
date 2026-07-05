@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"dev-resource-manager/internal/config"
+	processdetail "dev-resource-manager/internal/detail"
 	portscanner "dev-resource-manager/internal/port"
 	processscanner "dev-resource-manager/internal/process"
 	"dev-resource-manager/internal/resource"
@@ -124,6 +125,25 @@ func (a *App) GetProcessList() ([]processscanner.Info, error) {
 	return processes, nil
 }
 
+// GetProcessDetail returns a single process detail view with ports and recent logs.
+func (a *App) GetProcessDetail(pid int) (processdetail.ProcessDetail, error) {
+	ctx := a.appContext()
+	rules, err := a.loadProtectionRules(ctx)
+	if err != nil {
+		return processdetail.ProcessDetail{}, err
+	}
+
+	snapshot, err := processdetail.ReadProcessSnapshot(ctx, int32(pid), rules)
+	if err != nil {
+		return processdetail.ProcessDetail{}, err
+	}
+
+	ports, portsError := a.processDetailPorts(ctx, rules)
+	logs, logsError := a.processDetailLogs(ctx, pid, snapshot.ProcessName)
+
+	return processdetail.BuildProcessDetail(snapshot, ports, logs, portsError, logsError), nil
+}
+
 // GetPortList returns the current Windows TCP/UDP port occupancy list for the frontend.
 func (a *App) GetPortList() ([]portscanner.Info, error) {
 	ctx := a.appContext()
@@ -138,6 +158,30 @@ func (a *App) GetPortList() ([]portscanner.Info, error) {
 	}
 
 	return ports, nil
+}
+
+func (a *App) processDetailPorts(ctx context.Context, rules config.ProtectionRules) ([]portscanner.Info, string) {
+	ports, err := portscanner.ListWithProtector(ctx, rules)
+	if err != nil {
+		return nil, "Unable to load occupied ports for this process: " + err.Error()
+	}
+
+	return ports, ""
+}
+
+func (a *App) processDetailLogs(ctx context.Context, pid int, processName string) ([]config.OperationLog, string) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return nil, "Unable to open operation log store: " + err.Error()
+	}
+	defer store.Close()
+
+	logs, err := store.GetRecentOperationLogsForProcess(ctx, pid, processName, processdetail.RecentLogLimit())
+	if err != nil {
+		return nil, "Unable to load recent operation logs: " + err.Error()
+	}
+
+	return logs, ""
 }
 
 // KillProcessByPID ends a non-protected process by PID and returns an operation result.

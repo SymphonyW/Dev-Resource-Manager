@@ -138,6 +138,52 @@ func TestOperationLogsAreStoredNewestFirst(t *testing.T) {
 	}
 }
 
+func TestRecentOperationLogsForProcessFiltersByPIDOrProcessName(t *testing.T) {
+	ctx := context.Background()
+	store := newTestStore(t)
+
+	inputs := []OperationLogInput{
+		{
+			Action:      "kill_process_by_pid",
+			PID:         100,
+			ProcessName: "node.exe",
+			Result:      "success",
+			Message:     "Process node.exe ended.",
+		},
+		{
+			Action:      "kill_process_by_port",
+			PID:         0,
+			ProcessName: "NODE.EXE",
+			Port:        3000,
+			Result:      "failure",
+			Message:     "Permission denied.",
+		},
+		{
+			Action:      "kill_process_by_pid",
+			PID:         200,
+			ProcessName: "postgres.exe",
+			Result:      "success",
+			Message:     "Process postgres.exe ended.",
+		},
+	}
+	for _, input := range inputs {
+		if err := store.AddOperationLog(ctx, input); err != nil {
+			t.Fatalf("add operation log: %v", err)
+		}
+	}
+
+	logs, err := store.GetRecentOperationLogsForProcess(ctx, 100, "node.exe", 5)
+	if err != nil {
+		t.Fatalf("get process operation logs: %v", err)
+	}
+	if len(logs) != 2 {
+		t.Fatalf("expected 2 related logs, got %d: %+v", len(logs), logs)
+	}
+	if logs[0].ProcessName != "NODE.EXE" || logs[1].PID != 100 {
+		t.Fatalf("expected newest related PID/name logs first, got %+v", logs)
+	}
+}
+
 func newTestStore(t *testing.T) *Store {
 	t.Helper()
 

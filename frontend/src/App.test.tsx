@@ -4,6 +4,7 @@ import App from './App';
 
 const getSystemResourceInfoMock = vi.fn();
 const getProcessListMock = vi.fn();
+const getProcessDetailMock = vi.fn();
 const getPortListMock = vi.fn();
 const killProcessByPIDMock = vi.fn();
 const killProcessByPortMock = vi.fn();
@@ -18,6 +19,7 @@ vi.mock('../wailsjs/go/main/App', () => ({
     DeleteCustomProtectedProcessName: (name: string) => deleteCustomProtectedProcessNameMock(name),
     GetOperationLogs: () => getOperationLogsMock(),
     GetPortList: () => getPortListMock(),
+    GetProcessDetail: (pid: number) => getProcessDetailMock(pid),
     GetProcessList: () => getProcessListMock(),
     GetProtectionSettings: () => getProtectionSettingsMock(),
     GetSystemResourceInfo: () => getSystemResourceInfoMock(),
@@ -154,6 +156,31 @@ const operationLogs = [
     },
 ];
 
+const nodeProcessDetail = {
+    pid: 100,
+    processName: 'node.exe',
+    executablePath: '',
+    executablePathError: 'Unable to read executable path. Try running as administrator.',
+    commandLine: 'node server.js',
+    commandLineError: '',
+    cpuPercent: 12.3,
+    memoryBytes: 512 * 1024 * 1024,
+    isProtected: false,
+    isDeveloperRelated: true,
+    ports: [
+        {
+            port: 3000,
+            protocol: 'TCP',
+            status: 'LISTEN',
+        },
+    ],
+    portsError: '',
+    recentLogs: [
+        operationLogs[0],
+    ],
+    logsError: '',
+};
+
 describe('App layout navigation', () => {
     afterEach(() => {
         vi.useRealTimers();
@@ -177,6 +204,8 @@ describe('App layout navigation', () => {
         });
         getProcessListMock.mockReset();
         getProcessListMock.mockResolvedValue(processRows);
+        getProcessDetailMock.mockReset();
+        getProcessDetailMock.mockResolvedValue(nodeProcessDetail);
         getPortListMock.mockReset();
         getPortListMock.mockResolvedValue(portRows);
         killProcessByPIDMock.mockReset();
@@ -411,6 +440,60 @@ describe('App layout navigation', () => {
         const commandCell = within(nodeRow as HTMLTableRowElement).getByText('node server.js');
         expect(commandCell).toHaveClass('command-cell');
         expect(commandCell).toHaveAttribute('title', 'node server.js');
+    });
+
+    it('opens a process detail drawer with ports logs and permission warnings without resetting filters', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Process name'), {target: {value: 'node'}});
+        const nodeRow = screen.getByText('node.exe').closest('tr');
+        expect(nodeRow).not.toBeNull();
+        fireEvent.click(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'Details'}));
+
+        await waitFor(() => expect(getProcessDetailMock).toHaveBeenCalledWith(100));
+        const drawer = await screen.findByRole('complementary', {name: 'Process detail'});
+
+        expect(within(drawer).getByText('node.exe')).toBeInTheDocument();
+        expect(within(drawer).getByText('100')).toBeInTheDocument();
+        expect(within(drawer).getByText('Unable to read executable path. Try running as administrator.')).toBeInTheDocument();
+        expect(within(drawer).getByText('node server.js')).toBeInTheDocument();
+        expect(within(drawer).getByText('Developer-related')).toBeInTheDocument();
+        expect(within(drawer).getByText('3000')).toBeInTheDocument();
+        expect(within(drawer).getByText('kill_process_by_port')).toBeInTheDocument();
+        expect(within(drawer).getByText('Process node.exe (PID 100) ended for TCP port 3000.')).toBeInTheDocument();
+
+        fireEvent.click(within(drawer).getByRole('button', {name: 'Close'}));
+
+        expect(screen.queryByRole('complementary', {name: 'Process detail'})).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Process name')).toHaveValue('node');
+    });
+
+    it('confirms before ending a process from the detail drawer', async () => {
+        getProcessListMock
+            .mockResolvedValueOnce(processRows)
+            .mockResolvedValueOnce(processRows.filter((process) => process.pid !== 100));
+
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+
+        const nodeRow = screen.getByText('node.exe').closest('tr');
+        expect(nodeRow).not.toBeNull();
+        fireEvent.click(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'Details'}));
+
+        const drawer = await screen.findByRole('complementary', {name: 'Process detail'});
+        fireEvent.click(within(drawer).getByRole('button', {name: 'End Process'}));
+
+        const dialog = screen.getByRole('dialog', {name: 'Confirm process termination'});
+        expect(within(dialog).getByText('node.exe')).toBeInTheDocument();
+        fireEvent.click(within(dialog).getByRole('button', {name: 'Confirm End Process'}));
+
+        await waitFor(() => expect(killProcessByPIDMock).toHaveBeenCalledWith(100));
+        expect(await screen.findByText('Process node.exe (PID 100) ended.')).toBeInTheDocument();
     });
 
     it('filters Processes by name and PID', async () => {

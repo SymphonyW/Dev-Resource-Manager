@@ -1,16 +1,23 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import StatusMessage from '../components/StatusMessage';
 import {formatMemorySize, formatPercent, isHighMemoryUsage} from '../services/systemResources';
-import {killProcessByPID, loadProcessList} from '../services/processes';
+import {killProcessByPID, loadProcessDetail, loadProcessList} from '../services/processes';
 import type {Translator} from '../services/i18n';
 import type {PageDefinition} from '../types/navigation';
-import type {ProcessInfo, ProcessSortKey} from '../types/processes';
+import type {ProcessDetail, ProcessInfo, ProcessSortKey} from '../types/processes';
 
 const processRefreshIntervalMs = 5000;
 
 interface ProcessesPageProps {
     page: PageDefinition;
     t: Translator;
+}
+
+interface KillTarget {
+    pid: number;
+    name: string;
+    path: string;
+    memoryBytes: number;
 }
 
 function ProcessesPage({page, t}: ProcessesPageProps) {
@@ -22,7 +29,11 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
     const [isKilling, setIsKilling] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [operationMessage, setOperationMessage] = useState('');
-    const [processToKill, setProcessToKill] = useState<ProcessInfo | null>(null);
+    const [processToKill, setProcessToKill] = useState<KillTarget | null>(null);
+    const [selectedDetailPID, setSelectedDetailPID] = useState<number | null>(null);
+    const [processDetail, setProcessDetail] = useState<ProcessDetail | null>(null);
+    const [isDetailLoading, setIsDetailLoading] = useState(false);
+    const [detailErrorMessage, setDetailErrorMessage] = useState('');
 
     const loadProcesses = useCallback(async (showLoading = true) => {
         if (showLoading) {
@@ -52,9 +63,52 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
         return () => window.clearInterval(intervalId);
     }, [loadProcesses]);
 
+    const loadDetail = useCallback(async (pid: number) => {
+        setIsDetailLoading(true);
+        setDetailErrorMessage('');
+
+        try {
+            const detail = await loadProcessDetail(pid);
+            setProcessDetail(detail);
+        } catch {
+            setProcessDetail(null);
+            setDetailErrorMessage(t('detail.process.error'));
+        } finally {
+            setIsDetailLoading(false);
+        }
+    }, [t]);
+
+    const openProcessDetail = (process: ProcessInfo) => {
+        setOperationMessage('');
+        setSelectedDetailPID(process.pid);
+        setProcessDetail(null);
+        void loadDetail(process.pid);
+    };
+
+    const closeProcessDetail = () => {
+        setSelectedDetailPID(null);
+        setProcessDetail(null);
+        setDetailErrorMessage('');
+    };
+
     const openKillConfirmation = (process: ProcessInfo) => {
         setOperationMessage('');
-        setProcessToKill(process);
+        setProcessToKill({
+            pid: process.pid,
+            name: process.name,
+            path: process.path,
+            memoryBytes: process.memoryBytes,
+        });
+    };
+
+    const openDetailKillConfirmation = (detail: ProcessDetail) => {
+        setOperationMessage('');
+        setProcessToKill({
+            pid: detail.pid,
+            name: detail.processName,
+            path: detail.executablePath,
+            memoryBytes: detail.memoryBytes,
+        });
     };
 
     const closeKillConfirmation = () => {
@@ -68,16 +122,20 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
             return;
         }
 
+        const target = processToKill;
         setIsKilling(true);
         setErrorMessage('');
 
         try {
-            const result = await killProcessByPID(processToKill.pid);
+            const result = await killProcessByPID(target.pid);
             setOperationMessage(result.message);
             setProcessToKill(null);
 
             if (result.success) {
                 await loadProcesses(false);
+                if (selectedDetailPID === target.pid) {
+                    closeProcessDetail();
+                }
             }
         } catch {
             setOperationMessage(t('processes.killError'));
@@ -206,20 +264,164 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                             </span>
                                         </td>
                                         <td className="sticky-action-column">
-                                            <button
-                                                className="danger-button table-action-button"
-                                                type="button"
-                                                disabled={process.isProtected || isKilling}
-                                                onClick={() => openKillConfirmation(process)}
-                                            >
-                                                {t('terminate.process')}
-                                            </button>
+                                            <div className="row-action-stack">
+                                                <button
+                                                    className="sort-button table-action-button"
+                                                    type="button"
+                                                    onClick={() => openProcessDetail(process)}
+                                                >
+                                                    {t('processes.details')}
+                                                </button>
+                                                <button
+                                                    className="danger-button table-action-button"
+                                                    type="button"
+                                                    disabled={process.isProtected || isKilling}
+                                                    onClick={() => openKillConfirmation(process)}
+                                                >
+                                                    {t('terminate.process')}
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 );
                             })}
                         </tbody>
                     </table>
+                </div>
+            )}
+
+            {selectedDetailPID !== null && (
+                <div className="process-detail-backdrop" role="presentation">
+                    <aside
+                        aria-label={t('detail.process.aria')}
+                        className="process-detail-drawer"
+                        role="complementary"
+                    >
+                        <div className="detail-drawer-header">
+                            <div>
+                                <p className="detail-drawer-kicker">{t('field.pid')} {selectedDetailPID}</p>
+                                <h2>{processDetail?.processName ? `${processDetail.processName} PID ${processDetail.pid}` : t('detail.process.aria')}</h2>
+                            </div>
+                            <button
+                                aria-label={t('common.close')}
+                                className="dialog-close-button"
+                                type="button"
+                                onClick={closeProcessDetail}
+                                disabled={isKilling}
+                            >
+                                {t('common.close')}
+                            </button>
+                        </div>
+
+                        {detailErrorMessage && <StatusMessage variant="error">{detailErrorMessage}</StatusMessage>}
+                        {isDetailLoading && !processDetail && (
+                            <StatusMessage variant="loading">{t('detail.process.loading')}</StatusMessage>
+                        )}
+
+                        {processDetail && (
+                            <div className="detail-drawer-body">
+                                <div className="detail-badge-row">
+                                    <span className={processDetail.isProtected ? 'protected-badge' : 'standard-badge'}>
+                                        {processDetail.isProtected ? t('badge.protected') : t('badge.standard')}
+                                    </span>
+                                    <span className={processDetail.isDeveloperRelated ? 'protocol-badge' : 'standard-badge'}>
+                                        {processDetail.isDeveloperRelated ? t('detail.developerRelated') : t('detail.notDeveloperRelated')}
+                                    </span>
+                                </div>
+
+                                <dl className="detail-field-list">
+                                    <div>
+                                        <dt>{t('field.pid')}</dt>
+                                        <dd className="mono">{processDetail.pid}</dd>
+                                    </div>
+                                    <div>
+                                        <dt>{t('field.processName')}</dt>
+                                        <dd>{processDetail.processName || t('common.unknown')}</dd>
+                                    </div>
+                                    <div>
+                                        <dt>{t('field.executablePath')}</dt>
+                                        <dd>{renderDetailValue(processDetail.executablePath, processDetail.executablePathError, t)}</dd>
+                                    </div>
+                                    <div>
+                                        <dt>{t('field.command')}</dt>
+                                        <dd>{renderDetailValue(processDetail.commandLine, processDetail.commandLineError, t)}</dd>
+                                    </div>
+                                    <div>
+                                        <dt>{t('field.cpu')}</dt>
+                                        <dd className="mono">{formatPercent(processDetail.cpuPercent)}</dd>
+                                    </div>
+                                    <div>
+                                        <dt>{t('field.memory')}</dt>
+                                        <dd className="mono">{formatMemorySize(processDetail.memoryBytes)}</dd>
+                                    </div>
+                                </dl>
+
+                                <div className="detail-section">
+                                    <div className="detail-section-header">
+                                        <h3>{t('field.ports')}</h3>
+                                        <span className="settings-count">{processDetail.ports.length}</span>
+                                    </div>
+                                    {processDetail.portsError && (
+                                        <p className="detail-inline-warning">{processDetail.portsError}</p>
+                                    )}
+                                    {processDetail.ports.length === 0 && !processDetail.portsError && (
+                                        <p className="detail-empty">{t('detail.noPorts')}</p>
+                                    )}
+                                    {processDetail.ports.length > 0 && (
+                                        <ul className="detail-port-list">
+                                            {processDetail.ports.map((port) => (
+                                                <li key={`${port.protocol}-${port.port}-${port.status}`}>
+                                                    <span className="mono">{port.port}</span>
+                                                    <span className="protocol-badge">{port.protocol || t('common.unknown')}</span>
+                                                    <span className="mono muted-cell">{port.status || t('common.unknown')}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+
+                                <div className="detail-section">
+                                    <div className="detail-section-header">
+                                        <h3>{t('detail.recentLogs')}</h3>
+                                        <span className="settings-count">{processDetail.recentLogs.length}</span>
+                                    </div>
+                                    {processDetail.logsError && (
+                                        <p className="detail-inline-warning">{processDetail.logsError}</p>
+                                    )}
+                                    {processDetail.recentLogs.length === 0 && !processDetail.logsError && (
+                                        <p className="detail-empty">{t('detail.noLogs')}</p>
+                                    )}
+                                    {processDetail.recentLogs.length > 0 && (
+                                        <ul className="detail-log-list">
+                                            {processDetail.recentLogs.map((log) => (
+                                                <li key={log.id}>
+                                                    <div className="detail-log-meta">
+                                                        <span className="mono">{log.action}</span>
+                                                        <span className={log.result === 'success' ? 'result-badge success' : 'result-badge failure'}>
+                                                            {log.result === 'success' ? t('operation.succeeded') : t('operation.failed')}
+                                                        </span>
+                                                    </div>
+                                                    <p>{log.message || t('common.unavailable')}</p>
+                                                    <span className="mono muted-cell">{formatDetailCreatedAt(log.createdAt) || t('common.unavailable')}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+
+                                <div className="detail-actions">
+                                    <button
+                                        className="danger-button"
+                                        type="button"
+                                        disabled={processDetail.isProtected || isKilling}
+                                        onClick={() => openDetailKillConfirmation(processDetail)}
+                                    >
+                                        {t('terminate.process')}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </aside>
                 </div>
             )}
 
@@ -295,6 +497,26 @@ function processRowClassName(process: ProcessInfo): string | undefined {
     }
 
     return classNames.length > 0 ? classNames.join(' ') : undefined;
+}
+
+function renderDetailValue(value: string, error: string, t: Translator) {
+    if (value.trim() !== '') {
+        return <span>{value}</span>;
+    }
+    if (error.trim() !== '') {
+        return <span className="detail-inline-warning">{error}</span>;
+    }
+
+    return <span className="muted-cell">{t('common.unavailable')}</span>;
+}
+
+function formatDetailCreatedAt(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    return date.toLocaleString();
 }
 
 export default ProcessesPage;
