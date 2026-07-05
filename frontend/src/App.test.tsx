@@ -416,12 +416,14 @@ describe('App layout navigation', () => {
         expect(screen.getAllByText('Protected').length).toBeGreaterThan(1);
 
         const table = screen.getByRole('table', {name: 'Process list'});
+        const detailPanel = screen.getByRole('complementary', {name: 'Process detail'});
         const nodeRow = screen.getByText('node.exe').closest('tr');
 
         expect(nodeRow).not.toBeNull();
         expect(nodeRow).toHaveAttribute('tabindex', '0');
         expect(within(table).queryByRole('button', {name: 'Details'})).not.toBeInTheDocument();
         expect(within(table).queryByRole('button', {name: 'End Process'})).not.toBeInTheDocument();
+        expect(detailPanel).toHaveTextContent('Select a process row to view details.');
     });
 
     it('keeps long process commands visually constrained while preserving full command text', async () => {
@@ -463,7 +465,7 @@ describe('App layout navigation', () => {
 
         fireEvent.click(within(drawer).getByRole('button', {name: 'Close'}));
 
-        expect(screen.queryByRole('complementary', {name: 'Process detail'})).not.toBeInTheDocument();
+        expect(screen.getByRole('complementary', {name: 'Process detail'})).toHaveTextContent('Select a process row to view details.');
         expect(screen.getByLabelText('Process name')).toHaveValue('node');
     });
 
@@ -548,7 +550,7 @@ describe('App layout navigation', () => {
         expect(screen.getByText('Unable to load process list.')).toBeInTheDocument();
     });
 
-    it('loads Ports into a table with common dev port markers and protected actions disabled', async () => {
+    it('loads Ports into selectable rows with a detail panel and no inline action buttons', async () => {
         render(<App/>);
 
         fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
@@ -558,18 +560,34 @@ describe('App layout navigation', () => {
         expect(screen.getByText('5432')).toBeInTheDocument();
         expect(screen.getAllByText('Dev port')).toHaveLength(2);
 
+        const table = screen.getByRole('table', {name: 'Port list'});
+        const detailPanel = screen.getByRole('complementary', {name: 'Port detail'});
         const nodeRow = screen.getByText('node.exe').closest('tr');
         const protectedRow = screen.getByText('svchost.exe').closest('tr');
 
         expect(nodeRow).not.toBeNull();
         expect(protectedRow).not.toBeNull();
-        const nodeAction = within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End Occupancy'});
-        const protectedAction = within(protectedRow as HTMLTableRowElement).getByRole('button', {name: 'End Occupancy'});
+        expect(nodeRow).toHaveAttribute('tabindex', '0');
+        expect(within(table).queryByRole('button', {name: 'End Occupancy'})).not.toBeInTheDocument();
+        expect(detailPanel).toHaveTextContent('Select a port row to view details.');
 
-        expect(nodeAction.closest('td')).toHaveClass('sticky-action-column');
-        expect(protectedAction.closest('td')).toHaveClass('sticky-action-column');
-        expect(nodeAction).not.toBeDisabled();
-        expect(protectedAction).toBeDisabled();
+        fireEvent.click(nodeRow as HTMLTableRowElement);
+
+        expect(nodeRow).toHaveAttribute('aria-selected', 'true');
+        expect(within(detailPanel).getByText('3000')).toBeInTheDocument();
+        expect(within(detailPanel).getByText('TCP')).toBeInTheDocument();
+        expect(within(detailPanel).getByText('LISTEN')).toBeInTheDocument();
+        expect(within(detailPanel).getByText('100')).toBeInTheDocument();
+        expect(within(detailPanel).getByText('C:\\Program Files\\nodejs\\node.exe')).toBeInTheDocument();
+        await waitFor(() => expect(within(detailPanel).getByText('kill_process_by_port')).toBeInTheDocument());
+        expect(within(detailPanel).getByRole('button', {name: 'End Occupancy'})).not.toBeDisabled();
+
+        fireEvent.click(protectedRow as HTMLTableRowElement);
+        await act(async () => {});
+
+        expect(protectedRow).toHaveAttribute('aria-selected', 'true');
+        expect(within(detailPanel).getByText('135')).toBeInTheDocument();
+        expect(within(detailPanel).getByRole('button', {name: 'End Occupancy'})).toBeDisabled();
     });
 
     it('confirms before ending a port occupant and refreshes the port list', async () => {
@@ -584,7 +602,10 @@ describe('App layout navigation', () => {
 
         const nodeRow = screen.getByText('node.exe').closest('tr');
         expect(nodeRow).not.toBeNull();
-        fireEvent.click(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End Occupancy'}));
+        fireEvent.click(nodeRow as HTMLTableRowElement);
+
+        const detailPanel = screen.getByRole('complementary', {name: 'Port detail'});
+        fireEvent.click(within(detailPanel).getByRole('button', {name: 'End Occupancy'}));
 
         const dialog = screen.getByRole('dialog', {name: 'Confirm port occupancy termination'});
         expect(within(dialog).getByText('Port')).toBeInTheDocument();
@@ -669,7 +690,7 @@ describe('App layout navigation', () => {
         expect(screen.getByText('Unable to load port list.')).toBeInTheDocument();
     });
 
-    it('loads Cleanup candidates with ports and keeps protected processes unselectable', async () => {
+    it('loads Cleanup candidates into selectable rows with details and keeps protected processes unselectable', async () => {
         render(<App/>);
 
         fireEvent.click(screen.getByRole('button', {name: 'Cleanup'}));
@@ -685,8 +706,34 @@ describe('App layout navigation', () => {
         expect(screen.getByText('3000')).toBeInTheDocument();
         expect(screen.getByText('5432')).toBeInTheDocument();
 
+        const detailPanel = screen.getByRole('complementary', {name: 'Cleanup detail'});
+        const nodeRow = screen.getByText('node.exe').closest('tr');
+        const protectedRow = screen.getByText('vmmem').closest('tr');
+
+        expect(detailPanel).toHaveTextContent('Select a cleanup row to view details.');
+        expect(nodeRow).not.toBeNull();
+        expect(protectedRow).not.toBeNull();
+        expect(nodeRow).toHaveAttribute('tabindex', '0');
         expect(screen.getByRole('checkbox', {name: 'Select node.exe PID 100'})).not.toBeDisabled();
         expect(screen.getByRole('checkbox', {name: 'Select vmmem PID 500'})).toBeDisabled();
+
+        fireEvent.click(nodeRow as HTMLTableRowElement);
+
+        expect(nodeRow).toHaveAttribute('aria-selected', 'true');
+        expect(within(detailPanel).getByRole('heading', {name: 'node.exe PID 100'})).toBeInTheDocument();
+        expect(within(detailPanel).getByText('100')).toBeInTheDocument();
+        expect(within(detailPanel).getByText('C:\\Program Files\\nodejs\\node.exe')).toBeInTheDocument();
+        expect(within(detailPanel).getByText('node server.js')).toBeInTheDocument();
+        expect(within(detailPanel).getByText('3000')).toBeInTheDocument();
+        await waitFor(() => expect(within(detailPanel).getByText('kill_process_by_port')).toBeInTheDocument());
+        expect(within(detailPanel).getByRole('button', {name: 'End Process'})).not.toBeDisabled();
+
+        fireEvent.click(protectedRow as HTMLTableRowElement);
+        await act(async () => {});
+
+        expect(protectedRow).toHaveAttribute('aria-selected', 'true');
+        expect(within(detailPanel).getByRole('heading', {name: 'vmmem PID 500'})).toBeInTheDocument();
+        expect(within(detailPanel).getByRole('button', {name: 'End Process'})).toBeDisabled();
     });
 
     it('confirms and ends selected Cleanup candidates through the logged PID operation', async () => {

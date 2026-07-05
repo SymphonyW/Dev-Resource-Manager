@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"dev-resource-manager/internal/config"
 
@@ -42,6 +43,8 @@ func ListWithProtector(ctx context.Context, protector Protector) ([]Info, error)
 	}
 
 	processes := make([]Info, 0, len(pids))
+	seenPIDs := make(map[int32]struct{}, len(pids))
+	sampledAt := time.Now()
 	for _, pid := range pids {
 		process, err := gopsprocess.NewProcessWithContext(ctx, pid)
 		if err != nil {
@@ -49,6 +52,7 @@ func ListWithProtector(ctx context.Context, protector Protector) ([]Info, error)
 		}
 
 		info := Info{PID: pid}
+		seenPIDs[pid] = struct{}{}
 
 		if name, err := process.NameWithContext(ctx); err == nil {
 			info.Name = strings.TrimSpace(name)
@@ -68,13 +72,14 @@ func ListWithProtector(ctx context.Context, protector Protector) ([]Info, error)
 		if user, err := process.UsernameWithContext(ctx); err == nil {
 			info.User = strings.TrimSpace(user)
 		}
-		if cpuPercent, err := process.CPUPercentWithContext(ctx); err == nil && cpuPercent >= 0 {
-			info.CPUPercent = roundOneDecimal(cpuPercent)
+		if cpuTimes, err := process.TimesWithContext(ctx); err == nil && cpuTimes != nil {
+			info.CPUPercent = defaultCPUSampler.Percent(pid, cpuTimes.Total(), sampledAt)
 		}
 
 		info.IsProtected = protector.IsProtectedName(info.Name)
 		processes = append(processes, info)
 	}
+	defaultCPUSampler.Prune(seenPIDs)
 
 	sort.Slice(processes, func(i, j int) bool {
 		return processes[i].PID < processes[j].PID

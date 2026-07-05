@@ -221,8 +221,8 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                 <StatusMessage variant="empty">{emptyMessage}</StatusMessage>
             )}
 
-            {(visibleProcesses.length > 0 || selectedDetailPID !== null) && (
-                <div className={selectedDetailPID !== null ? 'process-detail-layout has-detail' : 'process-detail-layout'}>
+            {visibleProcesses.length > 0 && (
+                <div className="process-detail-layout has-detail">
                     {visibleProcesses.length > 0 && (
                         <div className="process-table-wrap compact-table-wrap">
                             <table className="process-table process-list-table compact-data-table" aria-label={t('table.processList')}>
@@ -280,7 +280,6 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                         </div>
                     )}
 
-                    {selectedDetailPID !== null && (
                     <aside
                         aria-label={t('detail.process.aria')}
                         className="process-detail-drawer"
@@ -288,23 +287,30 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                     >
                         <div className="detail-drawer-header">
                             <div>
-                                <p className="detail-drawer-kicker">{t('field.pid')} {selectedDetailPID}</p>
+                                <p className="detail-drawer-kicker">{selectedDetailPID !== null ? `${t('field.pid')} ${selectedDetailPID}` : t('detail.process.aria')}</p>
                                 <h2>{processDetail?.processName ? `${processDetail.processName} PID ${processDetail.pid}` : t('detail.process.aria')}</h2>
                             </div>
-                            <button
-                                aria-label={t('common.close')}
-                                className="dialog-close-button"
-                                type="button"
-                                onClick={closeProcessDetail}
-                                disabled={isKilling}
-                            >
-                                {t('common.close')}
-                            </button>
+                            {selectedDetailPID !== null && (
+                                <button
+                                    aria-label={t('common.close')}
+                                    className="dialog-close-button"
+                                    type="button"
+                                    onClick={closeProcessDetail}
+                                    disabled={isKilling}
+                                >
+                                    {t('common.close')}
+                                </button>
+                            )}
                         </div>
 
                         {detailErrorMessage && <StatusMessage variant="error">{detailErrorMessage}</StatusMessage>}
                         {isDetailLoading && !processDetail && (
                             <StatusMessage variant="loading">{t('detail.process.loading')}</StatusMessage>
+                        )}
+                        {selectedDetailPID === null && (
+                            <div className="detail-drawer-empty">
+                                <p>{t('detail.process.empty')}</p>
+                            </div>
                         )}
 
                         {processDetail && (
@@ -411,7 +417,6 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                             </div>
                         )}
                     </aside>
-                    )}
                 </div>
             )}
 

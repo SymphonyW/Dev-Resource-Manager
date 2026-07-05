@@ -718,11 +718,11 @@ h1 {
     background: #fff2d6;
 }
 
-.process-list-table tbody tr[tabindex] {
+.process-table tbody tr[tabindex] {
     cursor: pointer;
 }
 
-.process-list-table tbody tr[tabindex]:focus-visible td {
+.process-table tbody tr[tabindex]:focus-visible td {
     outline: 2px solid var(--accent);
     outline-offset: -2px;
 }
@@ -1020,6 +1020,20 @@ h1 {
     min-height: 0;
     overflow-y: auto;
     padding: 16px 18px 20px;
+}
+
+.detail-drawer-empty {
+    display: flex;
+    align-items: center;
+    min-height: 180px;
+    padding: 18px;
+}
+
+.detail-drawer-empty p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.5;
 }
 
 .process-detail-drawer .status-message {
