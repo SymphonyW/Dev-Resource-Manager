@@ -546,7 +546,7 @@ h1 {
 }
 
 .process-list-table {
-    min-width: 1088px;
+    min-width: 960px;
 }
 
 .process-list-table th:nth-child(1) {
@@ -568,10 +568,6 @@ h1 {
 .process-list-table th:nth-child(5),
 .process-list-table th:nth-child(8) {
     width: 86px;
-}
-
-.process-list-table th:nth-child(9) {
-    width: 154px;
 }
 
 .process-list-table th:nth-child(6) {
@@ -669,9 +665,9 @@ h1 {
     position: sticky;
     right: 0;
     z-index: 2;
-    width: 154px;
-    min-width: 154px;
-    max-width: 154px;
+    width: 102px;
+    min-width: 102px;
+    max-width: 102px;
     box-shadow: -10px 0 16px rgba(37, 99, 235, 0.08);
     text-align: center;
     vertical-align: middle;
@@ -720,6 +716,20 @@ h1 {
 
 .protected-row.high-memory-row td.sticky-action-column {
     background: #fff2d6;
+}
+
+.process-list-table tbody tr[tabindex] {
+    cursor: pointer;
+}
+
+.process-list-table tbody tr[tabindex]:focus-visible td {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.selected-process-row td,
+.selected-process-row td.sticky-action-column {
+    background: #eaf2ff;
 }
 
 .command-cell {
@@ -861,13 +871,6 @@ h1 {
     padding-inline: 10px;
 }
 
-.row-action-stack {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-}
-
 .modal-backdrop {
     position: fixed;
     inset: 0;
@@ -960,24 +963,32 @@ h1 {
     margin-top: 20px;
 }
 
-.process-detail-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 9;
-    display: flex;
-    justify-content: flex-end;
-    background: rgba(15, 23, 42, 0.16);
+.process-detail-layout {
+    display: grid;
+    gap: 12px;
+    align-items: start;
+}
+
+.process-detail-layout.has-detail {
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
+}
+
+.process-detail-layout.has-detail .process-table-wrap {
+    min-width: 0;
 }
 
 .process-detail-drawer {
     display: flex;
     flex-direction: column;
-    width: min(460px, 100vw);
-    height: 100vh;
+    position: sticky;
+    top: 0;
+    width: 100%;
+    max-height: calc(100vh - 48px);
     min-height: 0;
-    border-left: 1px solid var(--border);
+    border: 1px solid var(--border);
+    border-radius: 8px;
     background: var(--surface);
-    box-shadow: -18px 0 44px rgba(15, 23, 42, 0.16);
+    box-shadow: var(--shadow);
     overflow: hidden;
 }
 
@@ -1282,12 +1293,13 @@ h1 {
         grid-template-columns: 1fr;
     }
 
-    .row-action-stack {
-        flex-direction: column;
+    .process-detail-layout.has-detail {
+        grid-template-columns: 1fr;
     }
 
     .process-detail-drawer {
-        width: 100vw;
+        position: static;
+        max-height: none;
     }
 
     .detail-field-list div,

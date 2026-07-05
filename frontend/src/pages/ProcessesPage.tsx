@@ -1,4 +1,5 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
+import type {KeyboardEvent} from 'react';
 import StatusMessage from '../components/StatusMessage';
 import {formatMemorySize, formatPercent, isHighMemoryUsage} from '../services/systemResources';
 import {killProcessByPID, loadProcessDetail, loadProcessList} from '../services/processes';
@@ -91,16 +92,6 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
         setDetailErrorMessage('');
     };
 
-    const openKillConfirmation = (process: ProcessInfo) => {
-        setOperationMessage('');
-        setProcessToKill({
-            pid: process.pid,
-            name: process.name,
-            path: process.path,
-            memoryBytes: process.memoryBytes,
-        });
-    };
-
     const openDetailKillConfirmation = (detail: ProcessDetail) => {
         setOperationMessage('');
         setProcessToKill({
@@ -115,6 +106,15 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
         if (!isKilling) {
             setProcessToKill(null);
         }
+    };
+
+    const handleProcessRowKeyDown = (event: KeyboardEvent<HTMLTableRowElement>, process: ProcessInfo) => {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+        }
+
+        event.preventDefault();
+        openProcessDetail(process);
     };
 
     const confirmKillProcess = async () => {
@@ -221,77 +221,66 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                 <StatusMessage variant="empty">{emptyMessage}</StatusMessage>
             )}
 
-            {visibleProcesses.length > 0 && (
-                <div className="process-table-wrap compact-table-wrap">
-                    <table className="process-table process-list-table compact-data-table" aria-label={t('table.processList')}>
-                        <thead>
-                            <tr>
-                                <th>{t('field.pid')}</th>
-                                <th>{t('field.processName')}</th>
-                                <th>{t('field.path')}</th>
-                                <th>{t('field.command')}</th>
-                                <th>{t('field.cpu')}</th>
-                                <th>{t('field.memory')}</th>
-                                <th>{t('field.user')}</th>
-                                <th>{t('field.protected')}</th>
-                                <th className="sticky-action-column">{t('field.action')}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {visibleProcesses.map((process) => {
-                                const commandLine = process.commandLine || t('common.unavailable');
-                                const path = process.path || t('common.unavailable');
-
-                                return (
-                                    <tr key={process.pid} className={processRowClassName(process)}>
-                                        <td className="mono">{process.pid}</td>
-                                        <td data-testid="process-name">{process.name || t('common.unknown')}</td>
-                                        <td className="muted-cell compact-path-cell" title={path}>{path}</td>
-                                        <td className="muted-cell" title={commandLine}>
-                                            <span className="command-cell" title={commandLine}>{commandLine}</span>
-                                        </td>
-                                        <td className="mono metric-cell">{formatPercent(process.cpuPercent)}</td>
-                                        <td className="mono metric-cell">
-                                            {formatMemorySize(process.memoryBytes)}
-                                            {isHighMemoryUsage(process.memoryBytes) && <span className="memory-badge">{t('badge.high')}</span>}
-                                        </td>
-                                        <td className="compact-user-cell" title={process.user || t('common.unavailable')}>
-                                            {process.user || t('common.unavailable')}
-                                        </td>
-                                        <td>
-                                            <span className={process.isProtected ? 'protected-badge' : 'standard-badge'}>
-                                                {process.isProtected ? t('badge.protected') : t('badge.standard')}
-                                            </span>
-                                        </td>
-                                        <td className="sticky-action-column">
-                                            <div className="row-action-stack">
-                                                <button
-                                                    className="sort-button table-action-button"
-                                                    type="button"
-                                                    onClick={() => openProcessDetail(process)}
-                                                >
-                                                    {t('processes.details')}
-                                                </button>
-                                                <button
-                                                    className="danger-button table-action-button"
-                                                    type="button"
-                                                    disabled={process.isProtected || isKilling}
-                                                    onClick={() => openKillConfirmation(process)}
-                                                >
-                                                    {t('terminate.process')}
-                                                </button>
-                                            </div>
-                                        </td>
+            {(visibleProcesses.length > 0 || selectedDetailPID !== null) && (
+                <div className={selectedDetailPID !== null ? 'process-detail-layout has-detail' : 'process-detail-layout'}>
+                    {visibleProcesses.length > 0 && (
+                        <div className="process-table-wrap compact-table-wrap">
+                            <table className="process-table process-list-table compact-data-table" aria-label={t('table.processList')}>
+                                <thead>
+                                    <tr>
+                                        <th>{t('field.pid')}</th>
+                                        <th>{t('field.processName')}</th>
+                                        <th>{t('field.path')}</th>
+                                        <th>{t('field.command')}</th>
+                                        <th>{t('field.cpu')}</th>
+                                        <th>{t('field.memory')}</th>
+                                        <th>{t('field.user')}</th>
+                                        <th>{t('field.protected')}</th>
                                     </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+                                </thead>
+                                <tbody>
+                                    {visibleProcesses.map((process) => {
+                                        const commandLine = process.commandLine || t('common.unavailable');
+                                        const path = process.path || t('common.unavailable');
+                                        const isSelected = selectedDetailPID === process.pid;
 
-            {selectedDetailPID !== null && (
-                <div className="process-detail-backdrop" role="presentation">
+                                        return (
+                                            <tr
+                                                key={process.pid}
+                                                aria-selected={isSelected}
+                                                className={processRowClassName(process, isSelected)}
+                                                onClick={() => openProcessDetail(process)}
+                                                onKeyDown={(event) => handleProcessRowKeyDown(event, process)}
+                                                tabIndex={0}
+                                            >
+                                                <td className="mono">{process.pid}</td>
+                                                <td data-testid="process-name">{process.name || t('common.unknown')}</td>
+                                                <td className="muted-cell compact-path-cell" title={path}>{path}</td>
+                                                <td className="muted-cell" title={commandLine}>
+                                                    <span className="command-cell" title={commandLine}>{commandLine}</span>
+                                                </td>
+                                                <td className="mono metric-cell">{formatPercent(process.cpuPercent)}</td>
+                                                <td className="mono metric-cell">
+                                                    {formatMemorySize(process.memoryBytes)}
+                                                    {isHighMemoryUsage(process.memoryBytes) && <span className="memory-badge">{t('badge.high')}</span>}
+                                                </td>
+                                                <td className="compact-user-cell" title={process.user || t('common.unavailable')}>
+                                                    {process.user || t('common.unavailable')}
+                                                </td>
+                                                <td>
+                                                    <span className={process.isProtected ? 'protected-badge' : 'standard-badge'}>
+                                                        {process.isProtected ? t('badge.protected') : t('badge.standard')}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {selectedDetailPID !== null && (
                     <aside
                         aria-label={t('detail.process.aria')}
                         className="process-detail-drawer"
@@ -422,6 +411,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                             </div>
                         )}
                     </aside>
+                    )}
                 </div>
             )}
 
@@ -487,13 +477,16 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
     );
 }
 
-function processRowClassName(process: ProcessInfo): string | undefined {
+function processRowClassName(process: ProcessInfo, isSelected = false): string | undefined {
     const classNames = [];
     if (process.isProtected) {
         classNames.push('protected-row');
     }
     if (isHighMemoryUsage(process.memoryBytes)) {
         classNames.push('high-memory-row');
+    }
+    if (isSelected) {
+        classNames.push('selected-process-row');
     }
 
     return classNames.length > 0 ? classNames.join(' ') : undefined;

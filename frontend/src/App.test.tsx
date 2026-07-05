@@ -406,7 +406,7 @@ describe('App layout navigation', () => {
         expect(screen.getByLabelText('语言')).toHaveValue('zh');
     });
 
-    it('loads Processes into a table with protected markers and protected actions disabled', async () => {
+    it('loads Processes into selectable rows without inline action buttons', async () => {
         render(<App/>);
 
         fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
@@ -415,18 +415,13 @@ describe('App layout navigation', () => {
         expect(screen.getByText('System')).toBeInTheDocument();
         expect(screen.getAllByText('Protected').length).toBeGreaterThan(1);
 
-        const systemRow = screen.getByText('System').closest('tr');
+        const table = screen.getByRole('table', {name: 'Process list'});
         const nodeRow = screen.getByText('node.exe').closest('tr');
 
-        expect(systemRow).not.toBeNull();
         expect(nodeRow).not.toBeNull();
-        const systemAction = within(systemRow as HTMLTableRowElement).getByRole('button', {name: 'End Process'});
-        const nodeAction = within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End Process'});
-
-        expect(systemAction.closest('td')).toHaveClass('sticky-action-column');
-        expect(nodeAction.closest('td')).toHaveClass('sticky-action-column');
-        expect(systemAction).toBeDisabled();
-        expect(nodeAction).not.toBeDisabled();
+        expect(nodeRow).toHaveAttribute('tabindex', '0');
+        expect(within(table).queryByRole('button', {name: 'Details'})).not.toBeInTheDocument();
+        expect(within(table).queryByRole('button', {name: 'End Process'})).not.toBeInTheDocument();
     });
 
     it('keeps long process commands visually constrained while preserving full command text', async () => {
@@ -451,11 +446,12 @@ describe('App layout navigation', () => {
         fireEvent.change(screen.getByLabelText('Process name'), {target: {value: 'node'}});
         const nodeRow = screen.getByText('node.exe').closest('tr');
         expect(nodeRow).not.toBeNull();
-        fireEvent.click(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'Details'}));
+        fireEvent.click(nodeRow as HTMLTableRowElement);
 
         await waitFor(() => expect(getProcessDetailMock).toHaveBeenCalledWith(100));
         const drawer = await screen.findByRole('complementary', {name: 'Process detail'});
 
+        expect(nodeRow).toHaveAttribute('aria-selected', 'true');
         expect(within(drawer).getByText('node.exe')).toBeInTheDocument();
         expect(within(drawer).getByText('100')).toBeInTheDocument();
         expect(within(drawer).getByText('Unable to read executable path. Try running as administrator.')).toBeInTheDocument();
@@ -483,7 +479,7 @@ describe('App layout navigation', () => {
 
         const nodeRow = screen.getByText('node.exe').closest('tr');
         expect(nodeRow).not.toBeNull();
-        fireEvent.click(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'Details'}));
+        fireEvent.click(nodeRow as HTMLTableRowElement);
 
         const drawer = await screen.findByRole('complementary', {name: 'Process detail'});
         fireEvent.click(within(drawer).getByRole('button', {name: 'End Process'}));
@@ -550,34 +546,6 @@ describe('App layout navigation', () => {
         });
         await act(async () => {});
         expect(screen.getByText('Unable to load process list.')).toBeInTheDocument();
-    });
-
-    it('confirms before ending a process and shows operation result', async () => {
-        getProcessListMock
-            .mockResolvedValueOnce(processRows)
-            .mockResolvedValueOnce(processRows.filter((process) => process.pid !== 100));
-
-        render(<App/>);
-
-        fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
-        expect(await screen.findByText('node.exe')).toBeInTheDocument();
-
-        const nodeRow = screen.getByText('node.exe').closest('tr');
-        expect(nodeRow).not.toBeNull();
-        fireEvent.click(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End Process'}));
-
-        const dialog = screen.getByRole('dialog', {name: 'Confirm process termination'});
-        expect(within(dialog).getByText('PID')).toBeInTheDocument();
-        expect(within(dialog).getByText('100')).toBeInTheDocument();
-        expect(within(dialog).getByText('node.exe')).toBeInTheDocument();
-        expect(within(dialog).getByText('C:\\Program Files\\nodejs\\node.exe')).toBeInTheDocument();
-        expect(within(dialog).getByText('512.0 MB')).toBeInTheDocument();
-
-        fireEvent.click(within(dialog).getByRole('button', {name: 'Confirm End Process'}));
-
-        await waitFor(() => expect(killProcessByPIDMock).toHaveBeenCalledWith(100));
-        expect(await screen.findByText('Process node.exe (PID 100) ended.')).toBeInTheDocument();
-        expect(screen.queryByRole('dialog', {name: 'Confirm process termination'})).not.toBeInTheDocument();
     });
 
     it('loads Ports into a table with common dev port markers and protected actions disabled', async () => {
