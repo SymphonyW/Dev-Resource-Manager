@@ -22,6 +22,8 @@ export function GetProcessList():Promise<Array<process.Info>>;
 
 export function GetProtectionSettings():Promise<config.ProtectionSettings>;
 
+export function GetRecentOperationLogsForResource(arg1:number,arg2:string,arg3:Array<number>):Promise<Array<config.OperationLog>>;
+
 export function GetSystemResourceInfo():Promise<main.SystemResourceInfo>;
 
 export function KillProcessByPID(arg1:number):Promise<process.OperationResult>;

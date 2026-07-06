@@ -1,6 +1,9 @@
+import {readFileSync} from 'node:fs';
 import {act, fireEvent, render, screen, waitFor, within} from '@testing-library/react';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import App from './App';
+
+const appStyles = readFileSync('src/App.css', 'utf8');
 
 const getSystemResourceInfoMock = vi.fn();
 const getProcessListMock = vi.fn();
@@ -12,6 +15,7 @@ const getProtectionSettingsMock = vi.fn();
 const addCustomProtectedProcessNameMock = vi.fn();
 const deleteCustomProtectedProcessNameMock = vi.fn();
 const getOperationLogsMock = vi.fn();
+const getRecentOperationLogsForResourceMock = vi.fn();
 
 vi.mock('../wailsjs/go/main/App', () => ({
     AddCustomProtectedProcessName: (name: string) => addCustomProtectedProcessNameMock(name),
@@ -22,6 +26,7 @@ vi.mock('../wailsjs/go/main/App', () => ({
     GetProcessDetail: (pid: number) => getProcessDetailMock(pid),
     GetProcessList: () => getProcessListMock(),
     GetProtectionSettings: () => getProtectionSettingsMock(),
+    GetRecentOperationLogsForResource: (pid: number, processName: string, ports: number[]) => getRecentOperationLogsForResourceMock(pid, processName, ports),
     GetSystemResourceInfo: () => getSystemResourceInfoMock(),
     KillProcessByPID: (pid: number) => killProcessByPIDMock(pid),
     KillProcessByPort: (port: number, protocol: string) => killProcessByPortMock(port, protocol),
@@ -236,6 +241,8 @@ describe('App layout navigation', () => {
         });
         getOperationLogsMock.mockReset();
         getOperationLogsMock.mockResolvedValue(operationLogs);
+        getRecentOperationLogsForResourceMock.mockReset();
+        getRecentOperationLogsForResourceMock.mockResolvedValue(operationLogs);
     });
 
     it('renders all primary navigation pages and highlights Dashboard by default', async () => {
@@ -422,6 +429,7 @@ describe('App layout navigation', () => {
         expect(nodeRow).toHaveAttribute('tabindex', '0');
         expect(within(table).queryByRole('button', {name: 'Details'})).not.toBeInTheDocument();
         expect(within(table).queryByRole('button', {name: 'End Process'})).not.toBeInTheDocument();
+        expect(screen.queryByRole('complementary', {name: 'Process detail'})).not.toBeInTheDocument();
     });
 
     it('keeps long process commands visually constrained while preserving full command text', async () => {
@@ -548,7 +556,40 @@ describe('App layout navigation', () => {
         expect(screen.getByText('Unable to load process list.')).toBeInTheDocument();
     });
 
-    it('loads Ports into a table with common dev port markers and protected actions disabled', async () => {
+    it('does not overlap process refreshes while a scan is still pending', async () => {
+        vi.useFakeTimers();
+        let resolveInitialProcesses: (value: typeof processRows) => void = () => {};
+        getProcessListMock
+            .mockReturnValueOnce(new Promise<typeof processRows>((resolve) => {
+                resolveInitialProcesses = resolve;
+            }))
+            .mockResolvedValueOnce([]);
+
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
+        await act(async () => {});
+        expect(screen.getByText('Loading process list...')).toBeInTheDocument();
+
+        await act(async () => {
+            vi.advanceTimersByTime(15000);
+        });
+        await act(async () => {});
+        expect(getProcessListMock).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            resolveInitialProcesses(processRows);
+        });
+        expect(screen.getByText('node.exe')).toBeInTheDocument();
+
+        await act(async () => {
+            vi.advanceTimersByTime(5000);
+        });
+        await act(async () => {});
+        expect(getProcessListMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('loads Ports into selectable rows with a detail panel and no inline action buttons', async () => {
         render(<App/>);
 
         fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
@@ -558,18 +599,35 @@ describe('App layout navigation', () => {
         expect(screen.getByText('5432')).toBeInTheDocument();
         expect(screen.getAllByText('Dev port')).toHaveLength(2);
 
+        const table = screen.getByRole('table', {name: 'Port list'});
         const nodeRow = screen.getByText('node.exe').closest('tr');
         const protectedRow = screen.getByText('svchost.exe').closest('tr');
 
         expect(nodeRow).not.toBeNull();
         expect(protectedRow).not.toBeNull();
-        const nodeAction = within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End Occupancy'});
-        const protectedAction = within(protectedRow as HTMLTableRowElement).getByRole('button', {name: 'End Occupancy'});
+        expect(nodeRow).toHaveAttribute('tabindex', '0');
+        expect(within(table).queryByRole('button', {name: 'End Occupancy'})).not.toBeInTheDocument();
+        expect(screen.queryByRole('complementary', {name: 'Port detail'})).not.toBeInTheDocument();
 
-        expect(nodeAction.closest('td')).toHaveClass('sticky-action-column');
-        expect(protectedAction.closest('td')).toHaveClass('sticky-action-column');
-        expect(nodeAction).not.toBeDisabled();
-        expect(protectedAction).toBeDisabled();
+        fireEvent.click(nodeRow as HTMLTableRowElement);
+
+        const detailPanel = screen.getByRole('complementary', {name: 'Port detail'});
+        expect(nodeRow).toHaveAttribute('aria-selected', 'true');
+        await waitFor(() => expect(getRecentOperationLogsForResourceMock).toHaveBeenCalledWith(100, 'node.exe', [3000]));
+        expect(within(detailPanel).getByText('3000')).toBeInTheDocument();
+        expect(within(detailPanel).getByText('TCP')).toBeInTheDocument();
+        expect(within(detailPanel).getByText('LISTEN')).toBeInTheDocument();
+        expect(within(detailPanel).getByText('100')).toBeInTheDocument();
+        expect(within(detailPanel).getByText('C:\\Program Files\\nodejs\\node.exe')).toBeInTheDocument();
+        await waitFor(() => expect(within(detailPanel).getByText('kill_process_by_port')).toBeInTheDocument());
+        expect(within(detailPanel).getByRole('button', {name: 'End Occupancy'})).not.toBeDisabled();
+
+        fireEvent.click(protectedRow as HTMLTableRowElement);
+        await act(async () => {});
+
+        expect(protectedRow).toHaveAttribute('aria-selected', 'true');
+        expect(within(detailPanel).getByText('135')).toBeInTheDocument();
+        expect(within(detailPanel).getByRole('button', {name: 'End Occupancy'})).toBeDisabled();
     });
 
     it('confirms before ending a port occupant and refreshes the port list', async () => {
@@ -584,7 +642,10 @@ describe('App layout navigation', () => {
 
         const nodeRow = screen.getByText('node.exe').closest('tr');
         expect(nodeRow).not.toBeNull();
-        fireEvent.click(within(nodeRow as HTMLTableRowElement).getByRole('button', {name: 'End Occupancy'}));
+        fireEvent.click(nodeRow as HTMLTableRowElement);
+
+        const detailPanel = screen.getByRole('complementary', {name: 'Port detail'});
+        fireEvent.click(within(detailPanel).getByRole('button', {name: 'End Occupancy'}));
 
         const dialog = screen.getByRole('dialog', {name: 'Confirm port occupancy termination'});
         expect(within(dialog).getByText('Port')).toBeInTheDocument();
@@ -669,7 +730,7 @@ describe('App layout navigation', () => {
         expect(screen.getByText('Unable to load port list.')).toBeInTheDocument();
     });
 
-    it('loads Cleanup candidates with ports and keeps protected processes unselectable', async () => {
+    it('loads Cleanup candidates into selectable rows with details and keeps protected processes unselectable', async () => {
         render(<App/>);
 
         fireEvent.click(screen.getByRole('button', {name: 'Cleanup'}));
@@ -685,8 +746,90 @@ describe('App layout navigation', () => {
         expect(screen.getByText('3000')).toBeInTheDocument();
         expect(screen.getByText('5432')).toBeInTheDocument();
 
+        const nodeRow = screen.getByText('node.exe').closest('tr');
+        const protectedRow = screen.getByText('vmmem').closest('tr');
+
+        expect(screen.queryByRole('complementary', {name: 'Cleanup detail'})).not.toBeInTheDocument();
+        expect(nodeRow).not.toBeNull();
+        expect(protectedRow).not.toBeNull();
+        expect(nodeRow).toHaveAttribute('tabindex', '0');
         expect(screen.getByRole('checkbox', {name: 'Select node.exe PID 100'})).not.toBeDisabled();
         expect(screen.getByRole('checkbox', {name: 'Select vmmem PID 500'})).toBeDisabled();
+
+        fireEvent.click(nodeRow as HTMLTableRowElement);
+
+        const detailPanel = screen.getByRole('complementary', {name: 'Cleanup detail'});
+        expect(nodeRow).toHaveAttribute('aria-selected', 'true');
+        await waitFor(() => expect(getRecentOperationLogsForResourceMock).toHaveBeenCalledWith(100, 'node.exe', [3000]));
+        expect(within(detailPanel).getByRole('heading', {name: 'node.exe PID 100'})).toBeInTheDocument();
+        expect(within(detailPanel).getByText('100')).toBeInTheDocument();
+        expect(within(detailPanel).getByText('C:\\Program Files\\nodejs\\node.exe')).toBeInTheDocument();
+        expect(within(detailPanel).getByText('node server.js')).toBeInTheDocument();
+        expect(within(detailPanel).getByText('3000')).toBeInTheDocument();
+        await waitFor(() => expect(within(detailPanel).getByText('kill_process_by_port')).toBeInTheDocument());
+        expect(within(detailPanel).getByRole('button', {name: 'End Process'})).not.toBeDisabled();
+
+        fireEvent.click(protectedRow as HTMLTableRowElement);
+        await act(async () => {});
+
+        expect(protectedRow).toHaveAttribute('aria-selected', 'true');
+        expect(within(detailPanel).getByRole('heading', {name: 'vmmem PID 500'})).toBeInTheDocument();
+        expect(within(detailPanel).getByRole('button', {name: 'End Process'})).toBeDisabled();
+    });
+
+    it('keeps resource tables on the same process-first column model', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+        expect(getColumnHeaders('Process list')).toEqual([
+            'PID',
+            'Process Name',
+            'Path',
+            'Command',
+            'CPU',
+            'Memory',
+            'Ports',
+            'Protected',
+        ]);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
+        expect(await screen.findByText('3000')).toBeInTheDocument();
+        expect(getColumnHeaders('Port list')).toEqual([
+            'PID',
+            'Process Name',
+            'Path',
+            'Command',
+            'CPU',
+            'Memory',
+            'Port',
+            'Protocol',
+            'Status',
+            'Protected',
+        ]);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Cleanup'}));
+        expect(await screen.findByText('postgres.exe')).toBeInTheDocument();
+        expect(getColumnHeaders('Cleanup candidate list')).toEqual([
+            'Select',
+            'PID',
+            'Process Name',
+            'Path',
+            'Command',
+            'CPU',
+            'Memory',
+            'Ports',
+            'Protected',
+        ]);
+    });
+
+    it('keeps data table rows at a fixed height with single-line cells', () => {
+        expect(appStyles).toContain('--resource-table-header-height: 34px;');
+        expect(appStyles).toContain('--resource-table-row-height: 42px;');
+        expect(appStyles).toMatch(/\.process-table th\s*\{[^}]*height: var\(--resource-table-header-height\);/s);
+        expect(appStyles).toMatch(/\.process-table tbody tr\s*\{[^}]*height: var\(--resource-table-row-height\);/s);
+        expect(appStyles).toMatch(/\.process-table td\s*\{[^}]*height: var\(--resource-table-row-height\);/s);
+        expect(appStyles).toMatch(/\.command-cell\s*\{[^}]*white-space: nowrap;/s);
     });
 
     it('confirms and ends selected Cleanup candidates through the logged PID operation', async () => {
@@ -804,3 +947,11 @@ describe('App layout navigation', () => {
         expect(getOperationLogsMock).toHaveBeenCalledTimes(2);
     });
 });
+
+function getColumnHeaders(tableName: string): string[] {
+    const table = screen.getByRole('table', {name: tableName});
+
+    return within(table)
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent?.trim() ?? '');
+}

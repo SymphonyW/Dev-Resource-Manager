@@ -1,10 +1,13 @@
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useCallback, useMemo, useState} from 'react';
 import type {KeyboardEvent} from 'react';
 import StatusMessage from '../components/StatusMessage';
+import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
 import {formatMemorySize, formatPercent, isHighMemoryUsage} from '../services/systemResources';
+import {isCommonDevelopmentPort, loadPortList} from '../services/ports';
 import {killProcessByPID, loadProcessDetail, loadProcessList} from '../services/processes';
 import type {Translator} from '../services/i18n';
 import type {PageDefinition} from '../types/navigation';
+import type {PortInfo} from '../types/ports';
 import type {ProcessDetail, ProcessInfo, ProcessSortKey} from '../types/processes';
 
 const processRefreshIntervalMs = 5000;
@@ -23,6 +26,7 @@ interface KillTarget {
 
 function ProcessesPage({page, t}: ProcessesPageProps) {
     const [processes, setProcesses] = useState<ProcessInfo[]>([]);
+    const [processPorts, setProcessPorts] = useState<PortInfo[]>([]);
     const [nameSearch, setNameSearch] = useState('');
     const [pidSearch, setPidSearch] = useState('');
     const [sortKey, setSortKey] = useState<ProcessSortKey>('memory');
@@ -43,10 +47,15 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
         setErrorMessage('');
 
         try {
-            const nextProcesses = await loadProcessList();
+            const [nextProcesses, nextPorts] = await Promise.all([
+                loadProcessList(),
+                loadPortList().catch((): PortInfo[] => []),
+            ]);
             setProcesses(nextProcesses);
+            setProcessPorts(nextPorts);
         } catch {
             setProcesses([]);
+            setProcessPorts([]);
             setErrorMessage(t('processes.error'));
         } finally {
             if (showLoading) {
@@ -55,14 +64,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
         }
     }, [t]);
 
-    useEffect(() => {
-        void loadProcesses(true);
-        const intervalId = window.setInterval(() => {
-            void loadProcesses(false);
-        }, processRefreshIntervalMs);
-
-        return () => window.clearInterval(intervalId);
-    }, [loadProcesses]);
+    useSequentialAutoRefresh(loadProcesses, processRefreshIntervalMs);
 
     const loadDetail = useCallback(async (pid: number) => {
         setIsDetailLoading(true);
@@ -166,12 +168,13 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
             });
     }, [nameSearch, pidSearch, processes, sortKey]);
 
+    const portsByPID = useMemo(() => groupPortsByPID(processPorts), [processPorts]);
     const isFiltered = nameSearch.trim() !== '' || pidSearch.trim() !== '';
     const emptyMessage = isFiltered ? t('processes.emptyFiltered') : t('processes.empty');
 
     return (
         <section className="page-panel process-page" aria-label={page.title}>
-            <div className="process-toolbar compact-toolbar">
+            <div className="resource-toolbar process-toolbar">
                 <label className="filter-field">
                     <span>{t('filter.processName')}</span>
                     <input
@@ -221,64 +224,61 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                 <StatusMessage variant="empty">{emptyMessage}</StatusMessage>
             )}
 
-            {(visibleProcesses.length > 0 || selectedDetailPID !== null) && (
+            {visibleProcesses.length > 0 && (
                 <div className={selectedDetailPID !== null ? 'process-detail-layout has-detail' : 'process-detail-layout'}>
-                    {visibleProcesses.length > 0 && (
-                        <div className="process-table-wrap compact-table-wrap">
-                            <table className="process-table process-list-table compact-data-table" aria-label={t('table.processList')}>
-                                <thead>
-                                    <tr>
-                                        <th>{t('field.pid')}</th>
-                                        <th>{t('field.processName')}</th>
-                                        <th>{t('field.path')}</th>
-                                        <th>{t('field.command')}</th>
-                                        <th>{t('field.cpu')}</th>
-                                        <th>{t('field.memory')}</th>
-                                        <th>{t('field.user')}</th>
-                                        <th>{t('field.protected')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {visibleProcesses.map((process) => {
-                                        const commandLine = process.commandLine || t('common.unavailable');
-                                        const path = process.path || t('common.unavailable');
-                                        const isSelected = selectedDetailPID === process.pid;
+                    <div className="process-table-wrap compact-table-wrap">
+                        <table className="process-table process-list-table compact-data-table" aria-label={t('table.processList')}>
+                            <thead>
+                                <tr>
+                                    <th>{t('field.pid')}</th>
+                                    <th>{t('field.processName')}</th>
+                                    <th>{t('field.path')}</th>
+                                    <th>{t('field.command')}</th>
+                                    <th>{t('field.cpu')}</th>
+                                    <th>{t('field.memory')}</th>
+                                    <th>{t('field.ports')}</th>
+                                    <th>{t('field.protected')}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {visibleProcesses.map((process) => {
+                                    const commandLine = process.commandLine || t('common.unavailable');
+                                    const path = process.path || t('common.unavailable');
+                                    const isSelected = selectedDetailPID === process.pid;
+                                    const ownedPorts = portsByPID.get(process.pid) ?? [];
 
-                                        return (
-                                            <tr
-                                                key={process.pid}
-                                                aria-selected={isSelected}
-                                                className={processRowClassName(process, isSelected)}
-                                                onClick={() => openProcessDetail(process)}
-                                                onKeyDown={(event) => handleProcessRowKeyDown(event, process)}
-                                                tabIndex={0}
-                                            >
-                                                <td className="mono">{process.pid}</td>
-                                                <td data-testid="process-name">{process.name || t('common.unknown')}</td>
-                                                <td className="muted-cell compact-path-cell" title={path}>{path}</td>
-                                                <td className="muted-cell" title={commandLine}>
-                                                    <span className="command-cell" title={commandLine}>{commandLine}</span>
-                                                </td>
-                                                <td className="mono metric-cell">{formatPercent(process.cpuPercent)}</td>
-                                                <td className="mono metric-cell">
-                                                    {formatMemorySize(process.memoryBytes)}
-                                                    {isHighMemoryUsage(process.memoryBytes) && <span className="memory-badge">{t('badge.high')}</span>}
-                                                </td>
-                                                <td className="compact-user-cell" title={process.user || t('common.unavailable')}>
-                                                    {process.user || t('common.unavailable')}
-                                                </td>
-                                                <td>
-                                                    <span className={process.isProtected ? 'protected-badge' : 'standard-badge'}>
-                                                        {process.isProtected ? t('badge.protected') : t('badge.standard')}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                                    return (
+                                        <tr
+                                            key={process.pid}
+                                            aria-selected={isSelected}
+                                            className={processRowClassName(process, isSelected)}
+                                            onClick={() => openProcessDetail(process)}
+                                            onKeyDown={(event) => handleProcessRowKeyDown(event, process)}
+                                            tabIndex={0}
+                                        >
+                                            <td className="mono">{process.pid}</td>
+                                            <td data-testid="process-name">{process.name || t('common.unknown')}</td>
+                                            <td className="muted-cell compact-path-cell" title={path}>{path}</td>
+                                            <td className="muted-cell" title={commandLine}>
+                                                <span className="command-cell" title={commandLine}>{commandLine}</span>
+                                            </td>
+                                            <td className="mono metric-cell">{formatPercent(process.cpuPercent)}</td>
+                                            <td className="mono metric-cell">
+                                                {formatMemorySize(process.memoryBytes)}
+                                                {isHighMemoryUsage(process.memoryBytes) && <span className="memory-badge">{t('badge.high')}</span>}
+                                            </td>
+                                            <td className="mono">{renderProcessPorts(ownedPorts, t)}</td>
+                                            <td>
+                                                <span className={process.isProtected ? 'protected-badge' : 'standard-badge'}>
+                                                    {process.isProtected ? t('badge.protected') : t('badge.standard')}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
 
                     {selectedDetailPID !== null && (
                     <aside
@@ -288,18 +288,20 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                     >
                         <div className="detail-drawer-header">
                             <div>
-                                <p className="detail-drawer-kicker">{t('field.pid')} {selectedDetailPID}</p>
+                                <p className="detail-drawer-kicker">{selectedDetailPID !== null ? `${t('field.pid')} ${selectedDetailPID}` : t('detail.process.aria')}</p>
                                 <h2>{processDetail?.processName ? `${processDetail.processName} PID ${processDetail.pid}` : t('detail.process.aria')}</h2>
                             </div>
-                            <button
-                                aria-label={t('common.close')}
-                                className="dialog-close-button"
-                                type="button"
-                                onClick={closeProcessDetail}
-                                disabled={isKilling}
-                            >
-                                {t('common.close')}
-                            </button>
+                            {selectedDetailPID !== null && (
+                                <button
+                                    aria-label={t('common.close')}
+                                    className="dialog-close-button"
+                                    type="button"
+                                    onClick={closeProcessDetail}
+                                    disabled={isKilling}
+                                >
+                                    {t('common.close')}
+                                </button>
+                            )}
                         </div>
 
                         {detailErrorMessage && <StatusMessage variant="error">{detailErrorMessage}</StatusMessage>}
@@ -475,6 +477,36 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
             )}
         </section>
     );
+}
+
+function groupPortsByPID(ports: PortInfo[]): Map<number, PortInfo[]> {
+    const portsByPID = new Map<number, PortInfo[]>();
+    for (const port of ports) {
+        if (port.pid <= 0) {
+            continue;
+        }
+
+        const existingPorts = portsByPID.get(port.pid) ?? [];
+        existingPorts.push(port);
+        portsByPID.set(port.pid, existingPorts);
+    }
+
+    return portsByPID;
+}
+
+function renderProcessPorts(ports: PortInfo[], t: Translator) {
+    const portNumbers = Array.from(new Set(ports.map((port) => port.port).filter((port) => port > 0)))
+        .sort((left, right) => left - right);
+    if (portNumbers.length === 0) {
+        return t('common.none');
+    }
+
+    return portNumbers.map((port, index) => (
+        <span key={port}>
+            {index > 0 && ', '}
+            <span className={isCommonDevelopmentPort(port) ? 'inline-dev-port' : undefined}>{port}</span>
+        </span>
+    ));
 }
 
 function processRowClassName(process: ProcessInfo, isSelected = false): string | undefined {

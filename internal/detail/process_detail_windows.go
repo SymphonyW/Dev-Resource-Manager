@@ -5,7 +5,6 @@ package detail
 import (
 	"context"
 	"fmt"
-	"math"
 	"path/filepath"
 	"strings"
 
@@ -52,7 +51,7 @@ func ReadProcessSnapshot(ctx context.Context, pid int32, protector processscanne
 		snapshot.MemoryBytes = memory.RSS
 	}
 	if cpuPercent, err := process.CPUPercentWithContext(ctx); err == nil && cpuPercent >= 0 {
-		snapshot.CPUPercent = roundOneDecimal(cpuPercent)
+		snapshot.CPUPercent = processscanner.NormalizeCPUPercent(cpuPercent)
 	}
 	if protector != nil {
 		snapshot.IsProtected = protector.IsProtectedName(snapshot.ProcessName)
@@ -67,8 +66,4 @@ func readFailureMessage(field string, err error) string {
 	}
 
 	return fmt.Sprintf("Unable to read %s. Try running as administrator if Windows denied access: %v", field, err)
-}
-
-func roundOneDecimal(value float64) float64 {
-	return math.Round(value*10) / 10
 }

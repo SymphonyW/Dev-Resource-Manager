@@ -1,5 +1,6 @@
-import {FormEvent, useCallback, useEffect, useState} from 'react';
+import {FormEvent, useCallback, useState} from 'react';
 import StatusMessage from '../components/StatusMessage';
+import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
 import {
     addCustomProtectedProcessName,
     deleteCustomProtectedProcessName,
@@ -50,14 +51,7 @@ function SettingsPage({language, page, t, onLanguageChange}: SettingsPageProps) 
         }
     }, [t]);
 
-    useEffect(() => {
-        void loadSettings(true);
-        const intervalId = window.setInterval(() => {
-            void loadSettings(false);
-        }, settingsRefreshIntervalMs);
-
-        return () => window.clearInterval(intervalId);
-    }, [loadSettings]);
+    useSequentialAutoRefresh(loadSettings, settingsRefreshIntervalMs);
 
     const handleAddCustomProcess = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();

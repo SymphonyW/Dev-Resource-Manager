@@ -1,11 +1,15 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
+import type {KeyboardEvent} from 'react';
 import StatusMessage from '../components/StatusMessage';
+import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
 import {buildCleanupCandidates} from '../services/cleanup';
+import {loadRecentOperationLogsForResource} from '../services/logs';
 import {isCommonDevelopmentPort, loadPortList} from '../services/ports';
 import {killProcessByPID, loadProcessList} from '../services/processes';
 import {formatMemorySize, formatPercent, isHighMemoryUsage} from '../services/systemResources';
 import type {Translator} from '../services/i18n';
 import type {CleanupCandidate} from '../types/cleanup';
+import type {OperationLog} from '../types/logs';
 import type {PageDefinition} from '../types/navigation';
 import type {PortInfo} from '../types/ports';
 import type {ProcessInfo} from '../types/processes';
@@ -26,6 +30,10 @@ function CleanupPage({page, t}: CleanupPageProps) {
     const [errorMessage, setErrorMessage] = useState('');
     const [operationMessage, setOperationMessage] = useState('');
     const [isConfirmingBatch, setIsConfirmingBatch] = useState(false);
+    const [candidateToKill, setCandidateToKill] = useState<CleanupCandidate | null>(null);
+    const [selectedDetailPID, setSelectedDetailPID] = useState<number | null>(null);
+    const [operationLogs, setOperationLogs] = useState<OperationLog[]>([]);
+    const [logsErrorMessage, setLogsErrorMessage] = useState('');
 
     const loadCleanupData = useCallback(async (showLoading = true) => {
         if (showLoading) {
@@ -51,14 +59,7 @@ function CleanupPage({page, t}: CleanupPageProps) {
         }
     }, [t]);
 
-    useEffect(() => {
-        void loadCleanupData(true);
-        const intervalId = window.setInterval(() => {
-            void loadCleanupData(false);
-        }, cleanupRefreshIntervalMs);
-
-        return () => window.clearInterval(intervalId);
-    }, [loadCleanupData]);
+    useSequentialAutoRefresh(loadCleanupData, cleanupRefreshIntervalMs);
 
     const candidates = useMemo(() => {
         return buildCleanupCandidates(processes, ports);
@@ -86,6 +87,68 @@ function CleanupPage({page, t}: CleanupPageProps) {
         return candidates.filter((candidate) => selectedPIDs.has(candidate.pid));
     }, [candidates, selectedPIDs]);
 
+    const selectedCandidate = useMemo(() => {
+        if (selectedDetailPID === null) {
+            return null;
+        }
+
+        return candidates.find((candidate) => candidate.pid === selectedDetailPID) ?? null;
+    }, [candidates, selectedDetailPID]);
+
+    const selectedCandidatePorts = useMemo(() => {
+        if (!selectedCandidate) {
+            return [];
+        }
+
+        return ports.filter((port) => port.pid === selectedCandidate.pid);
+    }, [ports, selectedCandidate]);
+
+    const relatedLogs = useMemo(() => {
+        if (!selectedCandidate) {
+            return [];
+        }
+
+        return operationLogs.slice(0, 5);
+    }, [operationLogs, selectedCandidate]);
+
+    useEffect(() => {
+        if (selectedDetailPID === null) {
+            return;
+        }
+        if (!candidates.some((candidate) => candidate.pid === selectedDetailPID)) {
+            setSelectedDetailPID(null);
+            setOperationLogs([]);
+            setLogsErrorMessage('');
+        }
+    }, [candidates, selectedDetailPID]);
+
+    const loadRelatedLogs = useCallback(async (candidate: CleanupCandidate) => {
+        setLogsErrorMessage('');
+
+        try {
+            setOperationLogs(await loadRecentOperationLogsForResource({
+                pid: candidate.pid,
+                processName: candidate.name,
+                ports: candidate.ports,
+            }));
+        } catch {
+            setOperationLogs([]);
+            setLogsErrorMessage(t('logs.error'));
+        }
+    }, [t]);
+
+    const openCleanupDetail = (candidate: CleanupCandidate) => {
+        setOperationMessage('');
+        setSelectedDetailPID(candidate.pid);
+        void loadRelatedLogs(candidate);
+    };
+
+    const closeCleanupDetail = () => {
+        setSelectedDetailPID(null);
+        setOperationLogs([]);
+        setLogsErrorMessage('');
+    };
+
     const toggleCandidate = (candidate: CleanupCandidate) => {
         if (candidate.isProtected || isKilling) {
             return;
@@ -103,6 +166,30 @@ function CleanupPage({page, t}: CleanupPageProps) {
         });
     };
 
+    const openSingleKillConfirmation = (candidate: CleanupCandidate) => {
+        if (candidate.isProtected) {
+            return;
+        }
+
+        setOperationMessage('');
+        setCandidateToKill(candidate);
+    };
+
+    const closeSingleKillConfirmation = () => {
+        if (!isKilling) {
+            setCandidateToKill(null);
+        }
+    };
+
+    const handleCleanupRowKeyDown = (event: KeyboardEvent<HTMLTableRowElement>, candidate: CleanupCandidate) => {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+        }
+
+        event.preventDefault();
+        openCleanupDetail(candidate);
+    };
+
     const openBatchConfirmation = () => {
         setOperationMessage('');
         if (selectedCandidates.length > 0) {
@@ -113,6 +200,40 @@ function CleanupPage({page, t}: CleanupPageProps) {
     const closeBatchConfirmation = () => {
         if (!isKilling) {
             setIsConfirmingBatch(false);
+        }
+    };
+
+    const confirmSingleKill = async () => {
+        if (!candidateToKill) {
+            return;
+        }
+
+        const target = candidateToKill;
+        setIsKilling(true);
+        setErrorMessage('');
+
+        try {
+            const result = await killProcessByPID(target.pid);
+            setOperationMessage(result.message);
+            setCandidateToKill(null);
+
+            if (result.success) {
+                setSelectedPIDs((currentSelectedPIDs) => {
+                    const nextSelectedPIDs = new Set(currentSelectedPIDs);
+                    nextSelectedPIDs.delete(target.pid);
+                    return nextSelectedPIDs;
+                });
+                if (selectedDetailPID === target.pid) {
+                    closeCleanupDetail();
+                } else if (selectedCandidate) {
+                    await loadRelatedLogs(selectedCandidate);
+                }
+                await loadCleanupData(false);
+            }
+        } catch {
+            setOperationMessage(t('processes.killError'));
+        } finally {
+            setIsKilling(false);
         }
     };
 
@@ -147,6 +268,9 @@ function CleanupPage({page, t}: CleanupPageProps) {
 
         try {
             await loadCleanupData(false);
+            if (selectedCandidate) {
+                await loadRelatedLogs(selectedCandidate);
+            }
         } finally {
             setIsKilling(false);
         }
@@ -154,7 +278,7 @@ function CleanupPage({page, t}: CleanupPageProps) {
 
     return (
         <section className="page-panel process-page" aria-label={page.title}>
-            <div className="cleanup-toolbar" role="toolbar" aria-label={t('cleanup.actions')}>
+            <div className="resource-toolbar cleanup-toolbar" role="toolbar" aria-label={t('cleanup.actions')}>
                 <div className="cleanup-toolbar-stats">
                     <div className="cleanup-toolbar-stat">
                         <span>{t('cleanup.candidates')}</span>
@@ -186,48 +310,234 @@ function CleanupPage({page, t}: CleanupPageProps) {
             )}
 
             {candidates.length > 0 && (
-                <div className="process-table-wrap compact-table-wrap">
-                    <table className="process-table cleanup-table compact-data-table" aria-label={t('table.cleanupList')}>
-                        <thead>
-                            <tr>
-                                <th>{t('field.select')}</th>
-                                <th>{t('field.pid')}</th>
-                                <th>{t('field.processName')}</th>
-                                <th>{t('field.memory')}</th>
-                                <th>{t('field.cpu')}</th>
-                                <th>{t('field.ports')}</th>
-                                <th>{t('field.protected')}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {candidates.map((candidate) => (
-                                <tr key={candidate.pid} className={cleanupRowClassName(candidate)}>
-                                    <td>
-                                        <input
-                                            aria-label={`${t('cleanup.selectProcess')} ${candidate.name || t('common.unknown')} PID ${candidate.pid}`}
-                                            checked={selectedPIDs.has(candidate.pid)}
-                                            disabled={candidate.isProtected || isKilling}
-                                            type="checkbox"
-                                            onChange={() => toggleCandidate(candidate)}
-                                        />
-                                    </td>
-                                    <td className="mono">{candidate.pid}</td>
-                                    <td data-testid="cleanup-process-name">{candidate.name || t('common.unknown')}</td>
-                                    <td className="mono metric-cell">
-                                        {formatMemorySize(candidate.memoryBytes)}
-                                        {isHighMemoryUsage(candidate.memoryBytes) && <span className="memory-badge">{t('badge.high')}</span>}
-                                    </td>
-                                    <td className="mono metric-cell">{formatPercent(candidate.cpuPercent)}</td>
-                                    <td className="mono">{renderPorts(candidate.ports, t)}</td>
-                                    <td>
-                                        <span className={candidate.isProtected ? 'protected-badge' : 'standard-badge'}>
-                                            {candidate.isProtected ? t('badge.protected') : t('badge.standard')}
-                                        </span>
-                                    </td>
+                <div className={selectedCandidate ? 'process-detail-layout has-detail' : 'process-detail-layout'}>
+                    <div className="process-table-wrap compact-table-wrap">
+                        <table className="process-table cleanup-table compact-data-table" aria-label={t('table.cleanupList')}>
+                            <thead>
+                                <tr>
+                                    <th>{t('field.select')}</th>
+                                    <th>{t('field.pid')}</th>
+                                    <th>{t('field.processName')}</th>
+                                    <th>{t('field.path')}</th>
+                                    <th>{t('field.command')}</th>
+                                    <th>{t('field.cpu')}</th>
+                                    <th>{t('field.memory')}</th>
+                                    <th>{t('field.ports')}</th>
+                                    <th>{t('field.protected')}</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {candidates.map((candidate) => {
+                                    const isSelected = selectedDetailPID === candidate.pid;
+
+                                    return (
+                                        <tr
+                                            key={candidate.pid}
+                                            aria-selected={isSelected}
+                                            className={cleanupRowClassName(candidate, isSelected)}
+                                            onClick={() => openCleanupDetail(candidate)}
+                                            onKeyDown={(event) => handleCleanupRowKeyDown(event, candidate)}
+                                            tabIndex={0}
+                                        >
+                                            <td>
+                                                <input
+                                                    aria-label={`${t('cleanup.selectProcess')} ${candidate.name || t('common.unknown')} PID ${candidate.pid}`}
+                                                    checked={selectedPIDs.has(candidate.pid)}
+                                                    disabled={candidate.isProtected || isKilling}
+                                                    type="checkbox"
+                                                    onClick={(event) => event.stopPropagation()}
+                                                    onChange={() => toggleCandidate(candidate)}
+                                                    onKeyDown={(event) => event.stopPropagation()}
+                                                />
+                                            </td>
+                                            <td className="mono">{candidate.pid}</td>
+                                            <td data-testid="cleanup-process-name">{candidate.name || t('common.unknown')}</td>
+                                            <td className="muted-cell compact-path-cell" title={candidate.path || t('common.unavailable')}>
+                                                {candidate.path || t('common.unavailable')}
+                                            </td>
+                                            <td className="muted-cell" title={candidate.commandLine || t('common.unavailable')}>
+                                                <span className="command-cell" title={candidate.commandLine || t('common.unavailable')}>
+                                                    {candidate.commandLine || t('common.unavailable')}
+                                                </span>
+                                            </td>
+                                            <td className="mono metric-cell">{formatPercent(candidate.cpuPercent)}</td>
+                                            <td className="mono metric-cell">
+                                                {formatMemorySize(candidate.memoryBytes)}
+                                                {isHighMemoryUsage(candidate.memoryBytes) && <span className="memory-badge">{t('badge.high')}</span>}
+                                            </td>
+                                            <td className="mono">{renderPorts(candidate.ports, t)}</td>
+                                            <td>
+                                                <span className={candidate.isProtected ? 'protected-badge' : 'standard-badge'}>
+                                                    {candidate.isProtected ? t('badge.protected') : t('badge.standard')}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {selectedCandidate && (
+                    <aside
+                        aria-label={t('detail.cleanup.aria')}
+                        className="process-detail-drawer"
+                        role="complementary"
+                    >
+                        <div className="detail-drawer-header">
+                            <div>
+                                <p className="detail-drawer-kicker">{t('field.pid')} {selectedCandidate.pid}</p>
+                                <h2>{selectedCandidate.name || t('common.unknown')} PID {selectedCandidate.pid}</h2>
+                            </div>
+                            <button
+                                aria-label={t('common.close')}
+                                className="dialog-close-button"
+                                type="button"
+                                onClick={closeCleanupDetail}
+                                disabled={isKilling}
+                            >
+                                {t('common.close')}
+                            </button>
+                        </div>
+
+                        <div className="detail-drawer-body">
+                            <div className="detail-badge-row">
+                                <span className={selectedCandidate.isProtected ? 'protected-badge' : 'standard-badge'}>
+                                    {selectedCandidate.isProtected ? t('badge.protected') : t('badge.standard')}
+                                </span>
+                                <span className="protocol-badge">{t('detail.developerRelated')}</span>
+                            </div>
+
+                            <dl className="detail-field-list">
+                                <div>
+                                    <dt>{t('field.pid')}</dt>
+                                    <dd className="mono">{selectedCandidate.pid}</dd>
+                                </div>
+                                <div>
+                                    <dt>{t('field.processName')}</dt>
+                                    <dd>{selectedCandidate.name || t('common.unknown')}</dd>
+                                </div>
+                                <div>
+                                    <dt>{t('field.match')}</dt>
+                                    <dd>{selectedCandidate.match || t('common.unavailable')}</dd>
+                                </div>
+                                <div>
+                                    <dt>{t('field.path')}</dt>
+                                    <dd>{selectedCandidate.path || t('common.unavailable')}</dd>
+                                </div>
+                                <div>
+                                    <dt>{t('field.command')}</dt>
+                                    <dd>{selectedCandidate.commandLine || t('common.unavailable')}</dd>
+                                </div>
+                                <div>
+                                    <dt>{t('field.cpu')}</dt>
+                                    <dd className="mono">{formatPercent(selectedCandidate.cpuPercent)}</dd>
+                                </div>
+                                <div>
+                                    <dt>{t('field.memory')}</dt>
+                                    <dd className="mono">{formatMemorySize(selectedCandidate.memoryBytes)}</dd>
+                                </div>
+                            </dl>
+
+                            <div className="detail-section">
+                                <div className="detail-section-header">
+                                    <h3>{t('field.ports')}</h3>
+                                    <span className="settings-count">{selectedCandidatePorts.length}</span>
+                                </div>
+                                {selectedCandidatePorts.length === 0 && (
+                                    <p className="detail-empty">{t('detail.noPorts')}</p>
+                                )}
+                                {selectedCandidatePorts.length > 0 && (
+                                    <ul className="detail-port-list">
+                                        {selectedCandidatePorts.map((port) => (
+                                            <li key={`${port.protocol}-${port.port}-${port.status}`}>
+                                                <span className="mono">{port.port}</span>
+                                                <span className="protocol-badge">{port.protocol || t('common.unknown')}</span>
+                                                <span className="mono muted-cell">{port.status || t('common.unknown')}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+
+                            <CleanupRelatedLogs
+                                logs={relatedLogs}
+                                logsErrorMessage={logsErrorMessage}
+                                t={t}
+                            />
+
+                            <div className="detail-actions">
+                                <button
+                                    className="danger-button"
+                                    type="button"
+                                    disabled={selectedCandidate.isProtected || isKilling}
+                                    onClick={() => openSingleKillConfirmation(selectedCandidate)}
+                                >
+                                    {t('terminate.process')}
+                                </button>
+                            </div>
+                        </div>
+                    </aside>
+                    )}
+                </div>
+            )}
+
+            {candidateToKill && (
+                <div className="modal-backdrop" role="presentation">
+                    <section
+                        aria-labelledby="cleanup-single-dialog-title"
+                        className="confirmation-dialog"
+                        role="dialog"
+                    >
+                        <div className="dialog-header">
+                            <h2 id="cleanup-single-dialog-title">{t('dialog.process.title')}</h2>
+                            <button
+                                aria-label={t('common.close')}
+                                className="dialog-close-button"
+                                type="button"
+                                onClick={closeSingleKillConfirmation}
+                                disabled={isKilling}
+                            >
+                                {t('common.close')}
+                            </button>
+                        </div>
+                        <dl className="confirmation-details">
+                            <div>
+                                <dt>{t('field.pid')}</dt>
+                                <dd className="mono">{candidateToKill.pid}</dd>
+                            </div>
+                            <div>
+                                <dt>{t('field.processName')}</dt>
+                                <dd>{candidateToKill.name || t('common.unknown')}</dd>
+                            </div>
+                            <div>
+                                <dt>{t('field.path')}</dt>
+                                <dd>{candidateToKill.path || t('common.unavailable')}</dd>
+                            </div>
+                            <div>
+                                <dt>{t('field.memory')}</dt>
+                                <dd className="mono">{formatMemorySize(candidateToKill.memoryBytes)}</dd>
+                            </div>
+                        </dl>
+                        <div className="dialog-actions">
+                            <button
+                                className="sort-button"
+                                type="button"
+                                onClick={closeSingleKillConfirmation}
+                                disabled={isKilling}
+                            >
+                                {t('common.cancel')}
+                            </button>
+                            <button
+                                className="danger-button"
+                                type="button"
+                                onClick={confirmSingleKill}
+                                disabled={isKilling}
+                            >
+                                {t('dialog.action.confirmEndProcess')}
+                            </button>
+                        </div>
+                    </section>
                 </div>
             )}
 
@@ -308,7 +618,46 @@ function renderPorts(ports: number[], t: Translator) {
     ));
 }
 
-function cleanupRowClassName(candidate: CleanupCandidate): string | undefined {
+interface RelatedLogsProps {
+    logs: OperationLog[];
+    logsErrorMessage: string;
+    t: Translator;
+}
+
+function CleanupRelatedLogs({logs, logsErrorMessage, t}: RelatedLogsProps) {
+    return (
+        <div className="detail-section">
+            <div className="detail-section-header">
+                <h3>{t('detail.recentLogs')}</h3>
+                <span className="settings-count">{logs.length}</span>
+            </div>
+            {logsErrorMessage && (
+                <p className="detail-inline-warning">{logsErrorMessage}</p>
+            )}
+            {logs.length === 0 && !logsErrorMessage && (
+                <p className="detail-empty">{t('detail.noLogs')}</p>
+            )}
+            {logs.length > 0 && (
+                <ul className="detail-log-list">
+                    {logs.map((log) => (
+                        <li key={log.id}>
+                            <div className="detail-log-meta">
+                                <span className="mono">{log.action}</span>
+                                <span className={log.result === 'success' ? 'result-badge success' : 'result-badge failure'}>
+                                    {log.result === 'success' ? t('operation.succeeded') : t('operation.failed')}
+                                </span>
+                            </div>
+                            <p>{log.message || t('common.unavailable')}</p>
+                            <span className="mono muted-cell">{formatDetailCreatedAt(log.createdAt) || t('common.unavailable')}</span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+}
+
+function cleanupRowClassName(candidate: CleanupCandidate, isSelected = false): string | undefined {
     const classNames = [];
     if (candidate.isProtected) {
         classNames.push('protected-row');
@@ -319,8 +668,20 @@ function cleanupRowClassName(candidate: CleanupCandidate): string | undefined {
     if (candidate.ports.some(isCommonDevelopmentPort)) {
         classNames.push('dev-port-row');
     }
+    if (isSelected) {
+        classNames.push('selected-process-row');
+    }
 
     return classNames.length > 0 ? classNames.join(' ') : undefined;
+}
+
+function formatDetailCreatedAt(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    return date.toLocaleString();
 }
 
 export default CleanupPage;

@@ -1,5 +1,6 @@
-import {useCallback, useEffect, useState} from 'react';
+import {useCallback, useState} from 'react';
 import StatusMessage from '../components/StatusMessage';
+import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
 import {loadOperationLogs} from '../services/logs';
 import type {Translator} from '../services/i18n';
 import type {OperationLog} from '../types/logs';
@@ -36,14 +37,7 @@ function LogsPage({page, t}: LogsPageProps) {
         }
     }, [t]);
 
-    useEffect(() => {
-        void loadLogs(true);
-        const intervalId = window.setInterval(() => {
-            void loadLogs(false);
-        }, logRefreshIntervalMs);
-
-        return () => window.clearInterval(intervalId);
-    }, [loadLogs]);
+    useSequentialAutoRefresh(loadLogs, logRefreshIntervalMs);
 
     return (
         <section className="page-panel process-page" aria-label={page.title}>

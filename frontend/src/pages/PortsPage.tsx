@@ -1,9 +1,16 @@
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useCallback, useMemo, useState} from 'react';
+import type {KeyboardEvent} from 'react';
 import StatusMessage from '../components/StatusMessage';
+import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
+import {loadRecentOperationLogsForResource} from '../services/logs';
 import {isCommonDevelopmentPort, killProcessByPort, loadPortList} from '../services/ports';
+import {loadProcessList} from '../services/processes';
+import {formatMemorySize, formatPercent} from '../services/systemResources';
 import type {Translator} from '../services/i18n';
+import type {OperationLog} from '../types/logs';
 import type {PageDefinition} from '../types/navigation';
 import type {PortInfo, PortProtocolFilter} from '../types/ports';
+import type {ProcessInfo} from '../types/processes';
 
 const portRefreshIntervalMs = 5000;
 
@@ -14,6 +21,7 @@ interface PortsPageProps {
 
 function PortsPage({page, t}: PortsPageProps) {
     const [ports, setPorts] = useState<PortInfo[]>([]);
+    const [processes, setProcesses] = useState<ProcessInfo[]>([]);
     const [portSearch, setPortSearch] = useState('');
     const [processSearch, setProcessSearch] = useState('');
     const [protocolFilter, setProtocolFilter] = useState<PortProtocolFilter>('all');
@@ -23,6 +31,9 @@ function PortsPage({page, t}: PortsPageProps) {
     const [errorMessage, setErrorMessage] = useState('');
     const [operationMessage, setOperationMessage] = useState('');
     const [portToKill, setPortToKill] = useState<PortInfo | null>(null);
+    const [selectedPort, setSelectedPort] = useState<PortInfo | null>(null);
+    const [operationLogs, setOperationLogs] = useState<OperationLog[]>([]);
+    const [logsErrorMessage, setLogsErrorMessage] = useState('');
 
     const loadPorts = useCallback(async (showLoading = true) => {
         if (showLoading) {
@@ -31,10 +42,15 @@ function PortsPage({page, t}: PortsPageProps) {
         setErrorMessage('');
 
         try {
-            const nextPorts = await loadPortList();
+            const [nextPorts, nextProcesses] = await Promise.all([
+                loadPortList(),
+                loadProcessList().catch((): ProcessInfo[] => []),
+            ]);
             setPorts(nextPorts);
+            setProcesses(nextProcesses);
         } catch {
             setPorts([]);
+            setProcesses([]);
             setErrorMessage(t('ports.error'));
         } finally {
             if (showLoading) {
@@ -43,14 +59,34 @@ function PortsPage({page, t}: PortsPageProps) {
         }
     }, [t]);
 
-    useEffect(() => {
-        void loadPorts(true);
-        const intervalId = window.setInterval(() => {
-            void loadPorts(false);
-        }, portRefreshIntervalMs);
+    useSequentialAutoRefresh(loadPorts, portRefreshIntervalMs);
 
-        return () => window.clearInterval(intervalId);
-    }, [loadPorts]);
+    const loadRelatedLogs = useCallback(async (port: PortInfo) => {
+        setLogsErrorMessage('');
+
+        try {
+            setOperationLogs(await loadRecentOperationLogsForResource({
+                pid: port.pid,
+                processName: port.processName,
+                ports: [port.port],
+            }));
+        } catch {
+            setOperationLogs([]);
+            setLogsErrorMessage(t('logs.error'));
+        }
+    }, [t]);
+
+    const openPortDetail = (port: PortInfo) => {
+        setOperationMessage('');
+        setSelectedPort(port);
+        void loadRelatedLogs(port);
+    };
+
+    const closePortDetail = () => {
+        setSelectedPort(null);
+        setOperationLogs([]);
+        setLogsErrorMessage('');
+    };
 
     const openKillConfirmation = (port: PortInfo) => {
         setOperationMessage('');
@@ -78,12 +114,26 @@ function PortsPage({page, t}: PortsPageProps) {
 
             if (result.success) {
                 await loadPorts(false);
+                if (selectedPort && samePort(selectedPort, portToKill)) {
+                    closePortDetail();
+                } else if (selectedPort) {
+                    await loadRelatedLogs(selectedPort);
+                }
             }
         } catch {
             setOperationMessage(t('processes.killError'));
         } finally {
             setIsKilling(false);
         }
+    };
+
+    const handlePortRowKeyDown = (event: KeyboardEvent<HTMLTableRowElement>, port: PortInfo) => {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+        }
+
+        event.preventDefault();
+        openPortDetail(port);
     };
 
     const statusOptions = useMemo(() => {
@@ -111,10 +161,18 @@ function PortsPage({page, t}: PortsPageProps) {
         || protocolFilter !== 'all'
         || statusFilter !== 'all';
     const emptyMessage = isFiltered ? t('ports.emptyFiltered') : t('ports.empty');
+    const processesByPID = useMemo(() => groupProcessesByPID(processes), [processes]);
+    const relatedLogs = useMemo(() => {
+        if (!selectedPort) {
+            return [];
+        }
+
+        return operationLogs.slice(0, 5);
+    }, [operationLogs, selectedPort]);
 
     return (
         <section className="page-panel process-page" aria-label={page.title}>
-            <div className="port-toolbar compact-toolbar">
+            <div className="resource-toolbar port-toolbar">
                 <label className="filter-field compact-filter">
                     <span>{t('filter.port')}</span>
                     <input
@@ -172,52 +230,148 @@ function PortsPage({page, t}: PortsPageProps) {
             )}
 
             {visiblePorts.length > 0 && (
-                <div className="process-table-wrap compact-table-wrap">
-                    <table className="process-table port-table compact-data-table" aria-label={t('table.portList')}>
-                        <thead>
-                            <tr>
-                                <th>{t('field.port')}</th>
-                                <th>{t('field.protocol')}</th>
-                                <th>{t('field.status')}</th>
-                                <th>{t('field.pid')}</th>
-                                <th>{t('field.processName')}</th>
-                                <th>{t('field.processPath')}</th>
-                                <th className="sticky-action-column">{t('field.action')}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {visiblePorts.map((port) => {
-                                const isDevPort = isCommonDevelopmentPort(port.port);
+                <div className={selectedPort ? 'process-detail-layout has-detail' : 'process-detail-layout'}>
+                    <div className="process-table-wrap compact-table-wrap">
+                        <table className="process-table port-table compact-data-table" aria-label={t('table.portList')}>
+                            <thead>
+                                <tr>
+                                    <th>{t('field.pid')}</th>
+                                    <th>{t('field.processName')}</th>
+                                    <th>{t('field.path')}</th>
+                                    <th>{t('field.command')}</th>
+                                    <th>{t('field.cpu')}</th>
+                                    <th>{t('field.memory')}</th>
+                                    <th>{t('field.port')}</th>
+                                    <th>{t('field.protocol')}</th>
+                                    <th>{t('field.status')}</th>
+                                    <th>{t('field.protected')}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {visiblePorts.map((port) => {
+                                    const isDevPort = isCommonDevelopmentPort(port.port);
+                                    const isSelected = selectedPort ? samePort(selectedPort, port) : false;
+                                    const owner = processesByPID.get(port.pid);
+                                    const processName = owner?.name || port.processName || t('common.unknown');
+                                    const processPath = owner?.path || port.processPath || t('common.unavailable');
+                                    const commandLine = owner?.commandLine || t('common.unavailable');
+                                    const isProtected = owner?.isProtected ?? port.isProtected;
 
-                                return (
-                                    <tr key={`${port.protocol}-${port.port}-${port.pid}-${port.status}`} className={isDevPort ? 'dev-port-row' : undefined}>
-                                        <td>
-                                            <span className="mono">{port.port}</span>
-                                            {isDevPort && <span className="dev-port-badge">{t('badge.devPort')}</span>}
-                                        </td>
-                                        <td><span className="protocol-badge">{port.protocol || t('common.unknown')}</span></td>
-                                        <td className="mono">{port.status || t('common.unknown')}</td>
-                                        <td className="mono">{port.pid}</td>
-                                        <td data-testid="port-process-name">{port.processName || t('common.unknown')}</td>
-                                        <td className="muted-cell compact-path-cell" title={port.processPath || t('common.unavailable')}>
-                                            {port.processPath || t('common.unavailable')}
-                                        </td>
-                                        <td className="sticky-action-column">
-                                            <button
-                                                aria-label={t('terminate.occupancy')}
-                                                className="danger-button table-action-button"
-                                                type="button"
-                                                disabled={port.isProtected || isKilling}
-                                                onClick={() => openKillConfirmation(port)}
-                                            >
-                                                {t('terminate.occupancy')}
-                                            </button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                    return (
+                                        <tr
+                                            key={portRowKey(port)}
+                                            aria-selected={isSelected}
+                                            className={portRowClassName(port, isSelected)}
+                                            onClick={() => openPortDetail(port)}
+                                            onKeyDown={(event) => handlePortRowKeyDown(event, port)}
+                                            tabIndex={0}
+                                        >
+                                            <td className="mono">{port.pid}</td>
+                                            <td data-testid="port-process-name">{processName}</td>
+                                            <td className="muted-cell compact-path-cell" title={processPath}>
+                                                {processPath}
+                                            </td>
+                                            <td className="muted-cell" title={commandLine}>
+                                                <span className="command-cell" title={commandLine}>{commandLine}</span>
+                                            </td>
+                                            <td className="mono metric-cell">{owner ? formatPercent(owner.cpuPercent) : t('common.unavailable')}</td>
+                                            <td className="mono metric-cell">{owner ? formatMemorySize(owner.memoryBytes) : t('common.unavailable')}</td>
+                                            <td>
+                                                <span className="mono">{port.port}</span>
+                                                {isDevPort && <span className="dev-port-badge">{t('badge.devPort')}</span>}
+                                            </td>
+                                            <td><span className="protocol-badge">{port.protocol || t('common.unknown')}</span></td>
+                                            <td className="mono">{port.status || t('common.unknown')}</td>
+                                            <td>
+                                                <span className={isProtected ? 'protected-badge' : 'standard-badge'}>
+                                                    {isProtected ? t('badge.protected') : t('badge.standard')}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {selectedPort && (
+                    <aside
+                        aria-label={t('detail.port.aria')}
+                        className="process-detail-drawer"
+                        role="complementary"
+                    >
+                        <div className="detail-drawer-header">
+                            <div>
+                                <p className="detail-drawer-kicker">{t('field.port')} {selectedPort.port}</p>
+                                <h2>{selectedPort.processName || t('common.unknown')} :{selectedPort.port}</h2>
+                            </div>
+                            <button
+                                aria-label={t('common.close')}
+                                className="dialog-close-button"
+                                type="button"
+                                onClick={closePortDetail}
+                                disabled={isKilling}
+                            >
+                                {t('common.close')}
+                            </button>
+                        </div>
+
+                        <div className="detail-drawer-body">
+                            <div className="detail-badge-row">
+                                <span className={selectedPort.isProtected ? 'protected-badge' : 'standard-badge'}>
+                                    {selectedPort.isProtected ? t('badge.protected') : t('badge.standard')}
+                                </span>
+                                {isCommonDevelopmentPort(selectedPort.port) && (
+                                    <span className="protocol-badge">{t('badge.devPort')}</span>
+                                )}
+                            </div>
+
+                            <dl className="detail-field-list">
+                                <div>
+                                    <dt>{t('field.port')}</dt>
+                                    <dd className="mono">{selectedPort.port}</dd>
+                                </div>
+                                <div>
+                                    <dt>{t('field.protocol')}</dt>
+                                    <dd>{selectedPort.protocol || t('common.unknown')}</dd>
+                                </div>
+                                <div>
+                                    <dt>{t('field.status')}</dt>
+                                    <dd className="mono">{selectedPort.status || t('common.unknown')}</dd>
+                                </div>
+                                <div>
+                                    <dt>{t('field.pid')}</dt>
+                                    <dd className="mono">{selectedPort.pid}</dd>
+                                </div>
+                                <div>
+                                    <dt>{t('field.processName')}</dt>
+                                    <dd>{selectedPort.processName || t('common.unknown')}</dd>
+                                </div>
+                                <div>
+                                    <dt>{t('field.processPath')}</dt>
+                                    <dd>{selectedPort.processPath || t('common.unavailable')}</dd>
+                                </div>
+                            </dl>
+
+                            <PortRelatedLogs
+                                logs={relatedLogs}
+                                logsErrorMessage={logsErrorMessage}
+                                t={t}
+                            />
+
+                            <div className="detail-actions">
+                                <button
+                                    className="danger-button"
+                                    type="button"
+                                    disabled={selectedPort.isProtected || isKilling}
+                                    onClick={() => openKillConfirmation(selectedPort)}
+                                >
+                                    {t('terminate.occupancy')}
+                                </button>
+                            </div>
+                        </div>
+                    </aside>
+                    )}
                 </div>
             )}
 
@@ -285,6 +439,83 @@ function PortsPage({page, t}: PortsPageProps) {
             )}
         </section>
     );
+}
+
+function groupProcessesByPID(processes: ProcessInfo[]): Map<number, ProcessInfo> {
+    const processesByPID = new Map<number, ProcessInfo>();
+    for (const process of processes) {
+        processesByPID.set(process.pid, process);
+    }
+
+    return processesByPID;
+}
+
+interface RelatedLogsProps {
+    logs: OperationLog[];
+    logsErrorMessage: string;
+    t: Translator;
+}
+
+function PortRelatedLogs({logs, logsErrorMessage, t}: RelatedLogsProps) {
+    return (
+        <div className="detail-section">
+            <div className="detail-section-header">
+                <h3>{t('detail.recentLogs')}</h3>
+                <span className="settings-count">{logs.length}</span>
+            </div>
+            {logsErrorMessage && (
+                <p className="detail-inline-warning">{logsErrorMessage}</p>
+            )}
+            {logs.length === 0 && !logsErrorMessage && (
+                <p className="detail-empty">{t('detail.noLogs')}</p>
+            )}
+            {logs.length > 0 && (
+                <ul className="detail-log-list">
+                    {logs.map((log) => (
+                        <li key={log.id}>
+                            <div className="detail-log-meta">
+                                <span className="mono">{log.action}</span>
+                                <span className={log.result === 'success' ? 'result-badge success' : 'result-badge failure'}>
+                                    {log.result === 'success' ? t('operation.succeeded') : t('operation.failed')}
+                                </span>
+                            </div>
+                            <p>{log.message || t('common.unavailable')}</p>
+                            <span className="mono muted-cell">{formatDetailCreatedAt(log.createdAt) || t('common.unavailable')}</span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+}
+
+function portRowClassName(port: PortInfo, isSelected: boolean): string | undefined {
+    const classNames = [];
+    if (isCommonDevelopmentPort(port.port)) {
+        classNames.push('dev-port-row');
+    }
+    if (isSelected) {
+        classNames.push('selected-process-row');
+    }
+
+    return classNames.length > 0 ? classNames.join(' ') : undefined;
+}
+
+function portRowKey(port: PortInfo): string {
+    return `${port.protocol}-${port.port}-${port.pid}-${port.status}`;
+}
+
+function samePort(left: PortInfo, right: PortInfo): boolean {
+    return portRowKey(left) === portRowKey(right);
+}
+
+function formatDetailCreatedAt(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    return date.toLocaleString();
 }
 
 export default PortsPage;
