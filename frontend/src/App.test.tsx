@@ -824,7 +824,9 @@ describe('App layout navigation', () => {
     });
 
     it('keeps data table rows at a fixed height with single-line cells', () => {
+        expect(appStyles).toContain('--resource-table-header-height: 34px;');
         expect(appStyles).toContain('--resource-table-row-height: 42px;');
+        expect(appStyles).toMatch(/\.process-table th\s*\{[^}]*height: var\(--resource-table-header-height\);/s);
         expect(appStyles).toMatch(/\.process-table tbody tr\s*\{[^}]*height: var\(--resource-table-row-height\);/s);
         expect(appStyles).toMatch(/\.process-table td\s*\{[^}]*height: var\(--resource-table-row-height\);/s);
         expect(appStyles).toMatch(/\.command-cell\s*\{[^}]*white-space: nowrap;/s);
