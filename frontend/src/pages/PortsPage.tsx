@@ -4,10 +4,13 @@ import StatusMessage from '../components/StatusMessage';
 import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
 import {loadRecentOperationLogsForResource} from '../services/logs';
 import {isCommonDevelopmentPort, killProcessByPort, loadPortList} from '../services/ports';
+import {loadProcessList} from '../services/processes';
+import {formatMemorySize, formatPercent} from '../services/systemResources';
 import type {Translator} from '../services/i18n';
 import type {OperationLog} from '../types/logs';
 import type {PageDefinition} from '../types/navigation';
 import type {PortInfo, PortProtocolFilter} from '../types/ports';
+import type {ProcessInfo} from '../types/processes';
 
 const portRefreshIntervalMs = 5000;
 
@@ -18,6 +21,7 @@ interface PortsPageProps {
 
 function PortsPage({page, t}: PortsPageProps) {
     const [ports, setPorts] = useState<PortInfo[]>([]);
+    const [processes, setProcesses] = useState<ProcessInfo[]>([]);
     const [portSearch, setPortSearch] = useState('');
     const [processSearch, setProcessSearch] = useState('');
     const [protocolFilter, setProtocolFilter] = useState<PortProtocolFilter>('all');
@@ -38,10 +42,15 @@ function PortsPage({page, t}: PortsPageProps) {
         setErrorMessage('');
 
         try {
-            const nextPorts = await loadPortList();
+            const [nextPorts, nextProcesses] = await Promise.all([
+                loadPortList(),
+                loadProcessList().catch((): ProcessInfo[] => []),
+            ]);
             setPorts(nextPorts);
+            setProcesses(nextProcesses);
         } catch {
             setPorts([]);
+            setProcesses([]);
             setErrorMessage(t('ports.error'));
         } finally {
             if (showLoading) {
@@ -152,6 +161,7 @@ function PortsPage({page, t}: PortsPageProps) {
         || protocolFilter !== 'all'
         || statusFilter !== 'all';
     const emptyMessage = isFiltered ? t('ports.emptyFiltered') : t('ports.empty');
+    const processesByPID = useMemo(() => groupProcessesByPID(processes), [processes]);
     const relatedLogs = useMemo(() => {
         if (!selectedPort) {
             return [];
@@ -162,7 +172,7 @@ function PortsPage({page, t}: PortsPageProps) {
 
     return (
         <section className="page-panel process-page" aria-label={page.title}>
-            <div className="port-toolbar compact-toolbar">
+            <div className="resource-toolbar port-toolbar">
                 <label className="filter-field compact-filter">
                     <span>{t('filter.port')}</span>
                     <input
@@ -225,18 +235,27 @@ function PortsPage({page, t}: PortsPageProps) {
                         <table className="process-table port-table compact-data-table" aria-label={t('table.portList')}>
                             <thead>
                                 <tr>
+                                    <th>{t('field.pid')}</th>
+                                    <th>{t('field.processName')}</th>
+                                    <th>{t('field.path')}</th>
+                                    <th>{t('field.command')}</th>
+                                    <th>{t('field.cpu')}</th>
+                                    <th>{t('field.memory')}</th>
                                     <th>{t('field.port')}</th>
                                     <th>{t('field.protocol')}</th>
                                     <th>{t('field.status')}</th>
-                                    <th>{t('field.pid')}</th>
-                                    <th>{t('field.processName')}</th>
-                                    <th>{t('field.processPath')}</th>
+                                    <th>{t('field.protected')}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {visiblePorts.map((port) => {
                                     const isDevPort = isCommonDevelopmentPort(port.port);
                                     const isSelected = selectedPort ? samePort(selectedPort, port) : false;
+                                    const owner = processesByPID.get(port.pid);
+                                    const processName = owner?.name || port.processName || t('common.unknown');
+                                    const processPath = owner?.path || port.processPath || t('common.unavailable');
+                                    const commandLine = owner?.commandLine || t('common.unavailable');
+                                    const isProtected = owner?.isProtected ?? port.isProtected;
 
                                     return (
                                         <tr
@@ -247,16 +266,26 @@ function PortsPage({page, t}: PortsPageProps) {
                                             onKeyDown={(event) => handlePortRowKeyDown(event, port)}
                                             tabIndex={0}
                                         >
+                                            <td className="mono">{port.pid}</td>
+                                            <td data-testid="port-process-name">{processName}</td>
+                                            <td className="muted-cell compact-path-cell" title={processPath}>
+                                                {processPath}
+                                            </td>
+                                            <td className="muted-cell" title={commandLine}>
+                                                <span className="command-cell" title={commandLine}>{commandLine}</span>
+                                            </td>
+                                            <td className="mono metric-cell">{owner ? formatPercent(owner.cpuPercent) : t('common.unavailable')}</td>
+                                            <td className="mono metric-cell">{owner ? formatMemorySize(owner.memoryBytes) : t('common.unavailable')}</td>
                                             <td>
                                                 <span className="mono">{port.port}</span>
                                                 {isDevPort && <span className="dev-port-badge">{t('badge.devPort')}</span>}
                                             </td>
                                             <td><span className="protocol-badge">{port.protocol || t('common.unknown')}</span></td>
                                             <td className="mono">{port.status || t('common.unknown')}</td>
-                                            <td className="mono">{port.pid}</td>
-                                            <td data-testid="port-process-name">{port.processName || t('common.unknown')}</td>
-                                            <td className="muted-cell compact-path-cell" title={port.processPath || t('common.unavailable')}>
-                                                {port.processPath || t('common.unavailable')}
+                                            <td>
+                                                <span className={isProtected ? 'protected-badge' : 'standard-badge'}>
+                                                    {isProtected ? t('badge.protected') : t('badge.standard')}
+                                                </span>
                                             </td>
                                         </tr>
                                     );
@@ -410,6 +439,15 @@ function PortsPage({page, t}: PortsPageProps) {
             )}
         </section>
     );
+}
+
+function groupProcessesByPID(processes: ProcessInfo[]): Map<number, ProcessInfo> {
+    const processesByPID = new Map<number, ProcessInfo>();
+    for (const process of processes) {
+        processesByPID.set(process.pid, process);
+    }
+
+    return processesByPID;
 }
 
 interface RelatedLogsProps {

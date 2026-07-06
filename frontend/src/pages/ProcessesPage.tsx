@@ -3,9 +3,11 @@ import type {KeyboardEvent} from 'react';
 import StatusMessage from '../components/StatusMessage';
 import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
 import {formatMemorySize, formatPercent, isHighMemoryUsage} from '../services/systemResources';
+import {isCommonDevelopmentPort, loadPortList} from '../services/ports';
 import {killProcessByPID, loadProcessDetail, loadProcessList} from '../services/processes';
 import type {Translator} from '../services/i18n';
 import type {PageDefinition} from '../types/navigation';
+import type {PortInfo} from '../types/ports';
 import type {ProcessDetail, ProcessInfo, ProcessSortKey} from '../types/processes';
 
 const processRefreshIntervalMs = 5000;
@@ -24,6 +26,7 @@ interface KillTarget {
 
 function ProcessesPage({page, t}: ProcessesPageProps) {
     const [processes, setProcesses] = useState<ProcessInfo[]>([]);
+    const [processPorts, setProcessPorts] = useState<PortInfo[]>([]);
     const [nameSearch, setNameSearch] = useState('');
     const [pidSearch, setPidSearch] = useState('');
     const [sortKey, setSortKey] = useState<ProcessSortKey>('memory');
@@ -44,10 +47,15 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
         setErrorMessage('');
 
         try {
-            const nextProcesses = await loadProcessList();
+            const [nextProcesses, nextPorts] = await Promise.all([
+                loadProcessList(),
+                loadPortList().catch((): PortInfo[] => []),
+            ]);
             setProcesses(nextProcesses);
+            setProcessPorts(nextPorts);
         } catch {
             setProcesses([]);
+            setProcessPorts([]);
             setErrorMessage(t('processes.error'));
         } finally {
             if (showLoading) {
@@ -160,12 +168,13 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
             });
     }, [nameSearch, pidSearch, processes, sortKey]);
 
+    const portsByPID = useMemo(() => groupPortsByPID(processPorts), [processPorts]);
     const isFiltered = nameSearch.trim() !== '' || pidSearch.trim() !== '';
     const emptyMessage = isFiltered ? t('processes.emptyFiltered') : t('processes.empty');
 
     return (
         <section className="page-panel process-page" aria-label={page.title}>
-            <div className="process-toolbar compact-toolbar">
+            <div className="resource-toolbar process-toolbar">
                 <label className="filter-field">
                     <span>{t('filter.processName')}</span>
                     <input
@@ -227,7 +236,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                     <th>{t('field.command')}</th>
                                     <th>{t('field.cpu')}</th>
                                     <th>{t('field.memory')}</th>
-                                    <th>{t('field.user')}</th>
+                                    <th>{t('field.ports')}</th>
                                     <th>{t('field.protected')}</th>
                                 </tr>
                             </thead>
@@ -236,6 +245,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                     const commandLine = process.commandLine || t('common.unavailable');
                                     const path = process.path || t('common.unavailable');
                                     const isSelected = selectedDetailPID === process.pid;
+                                    const ownedPorts = portsByPID.get(process.pid) ?? [];
 
                                     return (
                                         <tr
@@ -257,9 +267,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                                 {formatMemorySize(process.memoryBytes)}
                                                 {isHighMemoryUsage(process.memoryBytes) && <span className="memory-badge">{t('badge.high')}</span>}
                                             </td>
-                                            <td className="compact-user-cell" title={process.user || t('common.unavailable')}>
-                                                {process.user || t('common.unavailable')}
-                                            </td>
+                                            <td className="mono">{renderProcessPorts(ownedPorts, t)}</td>
                                             <td>
                                                 <span className={process.isProtected ? 'protected-badge' : 'standard-badge'}>
                                                     {process.isProtected ? t('badge.protected') : t('badge.standard')}
@@ -469,6 +477,36 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
             )}
         </section>
     );
+}
+
+function groupPortsByPID(ports: PortInfo[]): Map<number, PortInfo[]> {
+    const portsByPID = new Map<number, PortInfo[]>();
+    for (const port of ports) {
+        if (port.pid <= 0) {
+            continue;
+        }
+
+        const existingPorts = portsByPID.get(port.pid) ?? [];
+        existingPorts.push(port);
+        portsByPID.set(port.pid, existingPorts);
+    }
+
+    return portsByPID;
+}
+
+function renderProcessPorts(ports: PortInfo[], t: Translator) {
+    const portNumbers = Array.from(new Set(ports.map((port) => port.port).filter((port) => port > 0)))
+        .sort((left, right) => left - right);
+    if (portNumbers.length === 0) {
+        return t('common.none');
+    }
+
+    return portNumbers.map((port, index) => (
+        <span key={port}>
+            {index > 0 && ', '}
+            <span className={isCommonDevelopmentPort(port) ? 'inline-dev-port' : undefined}>{port}</span>
+        </span>
+    ));
 }
 
 function processRowClassName(process: ProcessInfo, isSelected = false): string | undefined {

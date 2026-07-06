@@ -774,6 +774,52 @@ describe('App layout navigation', () => {
         expect(within(detailPanel).getByRole('button', {name: 'End Process'})).toBeDisabled();
     });
 
+    it('keeps resource tables on the same process-first column model', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+        expect(getColumnHeaders('Process list')).toEqual([
+            'PID',
+            'Process Name',
+            'Path',
+            'Command',
+            'CPU',
+            'Memory',
+            'Ports',
+            'Protected',
+        ]);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
+        expect(await screen.findByText('3000')).toBeInTheDocument();
+        expect(getColumnHeaders('Port list')).toEqual([
+            'PID',
+            'Process Name',
+            'Path',
+            'Command',
+            'CPU',
+            'Memory',
+            'Port',
+            'Protocol',
+            'Status',
+            'Protected',
+        ]);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Cleanup'}));
+        expect(await screen.findByText('postgres.exe')).toBeInTheDocument();
+        expect(getColumnHeaders('Cleanup candidate list')).toEqual([
+            'Select',
+            'PID',
+            'Process Name',
+            'Path',
+            'Command',
+            'CPU',
+            'Memory',
+            'Ports',
+            'Protected',
+        ]);
+    });
+
     it('confirms and ends selected Cleanup candidates through the logged PID operation', async () => {
         getProcessListMock
             .mockResolvedValueOnce(processRows)
@@ -889,3 +935,11 @@ describe('App layout navigation', () => {
         expect(getOperationLogsMock).toHaveBeenCalledTimes(2);
     });
 });
+
+function getColumnHeaders(tableName: string): string[] {
+    const table = screen.getByRole('table', {name: tableName});
+
+    return within(table)
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent?.trim() ?? '');
+}

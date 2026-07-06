@@ -278,7 +278,7 @@ function CleanupPage({page, t}: CleanupPageProps) {
 
     return (
         <section className="page-panel process-page" aria-label={page.title}>
-            <div className="cleanup-toolbar" role="toolbar" aria-label={t('cleanup.actions')}>
+            <div className="resource-toolbar cleanup-toolbar" role="toolbar" aria-label={t('cleanup.actions')}>
                 <div className="cleanup-toolbar-stats">
                     <div className="cleanup-toolbar-stat">
                         <span>{t('cleanup.candidates')}</span>
@@ -318,8 +318,10 @@ function CleanupPage({page, t}: CleanupPageProps) {
                                     <th>{t('field.select')}</th>
                                     <th>{t('field.pid')}</th>
                                     <th>{t('field.processName')}</th>
-                                    <th>{t('field.memory')}</th>
+                                    <th>{t('field.path')}</th>
+                                    <th>{t('field.command')}</th>
                                     <th>{t('field.cpu')}</th>
+                                    <th>{t('field.memory')}</th>
                                     <th>{t('field.ports')}</th>
                                     <th>{t('field.protected')}</th>
                                 </tr>
@@ -350,11 +352,19 @@ function CleanupPage({page, t}: CleanupPageProps) {
                                             </td>
                                             <td className="mono">{candidate.pid}</td>
                                             <td data-testid="cleanup-process-name">{candidate.name || t('common.unknown')}</td>
+                                            <td className="muted-cell compact-path-cell" title={candidate.path || t('common.unavailable')}>
+                                                {candidate.path || t('common.unavailable')}
+                                            </td>
+                                            <td className="muted-cell" title={candidate.commandLine || t('common.unavailable')}>
+                                                <span className="command-cell" title={candidate.commandLine || t('common.unavailable')}>
+                                                    {candidate.commandLine || t('common.unavailable')}
+                                                </span>
+                                            </td>
+                                            <td className="mono metric-cell">{formatPercent(candidate.cpuPercent)}</td>
                                             <td className="mono metric-cell">
                                                 {formatMemorySize(candidate.memoryBytes)}
                                                 {isHighMemoryUsage(candidate.memoryBytes) && <span className="memory-badge">{t('badge.high')}</span>}
                                             </td>
-                                            <td className="mono metric-cell">{formatPercent(candidate.cpuPercent)}</td>
                                             <td className="mono">{renderPorts(candidate.ports, t)}</td>
                                             <td>
                                                 <span className={candidate.isProtected ? 'protected-badge' : 'standard-badge'}>
