@@ -1,6 +1,9 @@
+import {readFileSync} from 'node:fs';
 import {act, fireEvent, render, screen, waitFor, within} from '@testing-library/react';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import App from './App';
+
+const appStyles = readFileSync('src/App.css', 'utf8');
 
 const getSystemResourceInfoMock = vi.fn();
 const getProcessListMock = vi.fn();
@@ -818,6 +821,13 @@ describe('App layout navigation', () => {
             'Ports',
             'Protected',
         ]);
+    });
+
+    it('keeps data table rows at a fixed height with single-line cells', () => {
+        expect(appStyles).toContain('--resource-table-row-height: 42px;');
+        expect(appStyles).toMatch(/\.process-table tbody tr\s*\{[^}]*height: var\(--resource-table-row-height\);/s);
+        expect(appStyles).toMatch(/\.process-table td\s*\{[^}]*height: var\(--resource-table-row-height\);/s);
+        expect(appStyles).toMatch(/\.command-cell\s*\{[^}]*white-space: nowrap;/s);
     });
 
     it('confirms and ends selected Cleanup candidates through the logged PID operation', async () => {
