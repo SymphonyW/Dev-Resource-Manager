@@ -1,5 +1,6 @@
-import {useCallback, useEffect, useState} from 'react';
+import {useCallback, useState} from 'react';
 import StatusMessage from '../components/StatusMessage';
+import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
 import {formatMemorySize, formatPercent, loadSystemResourceInfo} from '../services/systemResources';
 import type {Translator} from '../services/i18n';
 import type {PageDefinition} from '../types/navigation';
@@ -60,14 +61,7 @@ function DashboardPage({page, t}: DashboardPageProps) {
         }
     }, [t]);
 
-    useEffect(() => {
-        void loadResources(true);
-        const intervalId = window.setInterval(() => {
-            void loadResources(false);
-        }, resourceRefreshIntervalMs);
-
-        return () => window.clearInterval(intervalId);
-    }, [loadResources]);
+    useSequentialAutoRefresh(loadResources, resourceRefreshIntervalMs);
 
     const memoryPercent = resourceInfo ? getMemoryUsagePercent(resourceInfo) : 0;
     const vramPercent = resourceInfo ? getVRAMUsagePercent(resourceInfo) : 0;

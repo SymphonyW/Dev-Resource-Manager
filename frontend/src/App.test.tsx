@@ -12,6 +12,7 @@ const getProtectionSettingsMock = vi.fn();
 const addCustomProtectedProcessNameMock = vi.fn();
 const deleteCustomProtectedProcessNameMock = vi.fn();
 const getOperationLogsMock = vi.fn();
+const getRecentOperationLogsForResourceMock = vi.fn();
 
 vi.mock('../wailsjs/go/main/App', () => ({
     AddCustomProtectedProcessName: (name: string) => addCustomProtectedProcessNameMock(name),
@@ -22,6 +23,7 @@ vi.mock('../wailsjs/go/main/App', () => ({
     GetProcessDetail: (pid: number) => getProcessDetailMock(pid),
     GetProcessList: () => getProcessListMock(),
     GetProtectionSettings: () => getProtectionSettingsMock(),
+    GetRecentOperationLogsForResource: (pid: number, processName: string, ports: number[]) => getRecentOperationLogsForResourceMock(pid, processName, ports),
     GetSystemResourceInfo: () => getSystemResourceInfoMock(),
     KillProcessByPID: (pid: number) => killProcessByPIDMock(pid),
     KillProcessByPort: (port: number, protocol: string) => killProcessByPortMock(port, protocol),
@@ -236,6 +238,8 @@ describe('App layout navigation', () => {
         });
         getOperationLogsMock.mockReset();
         getOperationLogsMock.mockResolvedValue(operationLogs);
+        getRecentOperationLogsForResourceMock.mockReset();
+        getRecentOperationLogsForResourceMock.mockResolvedValue(operationLogs);
     });
 
     it('renders all primary navigation pages and highlights Dashboard by default', async () => {
@@ -549,6 +553,39 @@ describe('App layout navigation', () => {
         expect(screen.getByText('Unable to load process list.')).toBeInTheDocument();
     });
 
+    it('does not overlap process refreshes while a scan is still pending', async () => {
+        vi.useFakeTimers();
+        let resolveInitialProcesses: (value: typeof processRows) => void = () => {};
+        getProcessListMock
+            .mockReturnValueOnce(new Promise<typeof processRows>((resolve) => {
+                resolveInitialProcesses = resolve;
+            }))
+            .mockResolvedValueOnce([]);
+
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
+        await act(async () => {});
+        expect(screen.getByText('Loading process list...')).toBeInTheDocument();
+
+        await act(async () => {
+            vi.advanceTimersByTime(15000);
+        });
+        await act(async () => {});
+        expect(getProcessListMock).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            resolveInitialProcesses(processRows);
+        });
+        expect(screen.getByText('node.exe')).toBeInTheDocument();
+
+        await act(async () => {
+            vi.advanceTimersByTime(5000);
+        });
+        await act(async () => {});
+        expect(getProcessListMock).toHaveBeenCalledTimes(2);
+    });
+
     it('loads Ports into selectable rows with a detail panel and no inline action buttons', async () => {
         render(<App/>);
 
@@ -573,6 +610,7 @@ describe('App layout navigation', () => {
 
         const detailPanel = screen.getByRole('complementary', {name: 'Port detail'});
         expect(nodeRow).toHaveAttribute('aria-selected', 'true');
+        await waitFor(() => expect(getRecentOperationLogsForResourceMock).toHaveBeenCalledWith(100, 'node.exe', [3000]));
         expect(within(detailPanel).getByText('3000')).toBeInTheDocument();
         expect(within(detailPanel).getByText('TCP')).toBeInTheDocument();
         expect(within(detailPanel).getByText('LISTEN')).toBeInTheDocument();
@@ -719,6 +757,7 @@ describe('App layout navigation', () => {
 
         const detailPanel = screen.getByRole('complementary', {name: 'Cleanup detail'});
         expect(nodeRow).toHaveAttribute('aria-selected', 'true');
+        await waitFor(() => expect(getRecentOperationLogsForResourceMock).toHaveBeenCalledWith(100, 'node.exe', [3000]));
         expect(within(detailPanel).getByRole('heading', {name: 'node.exe PID 100'})).toBeInTheDocument();
         expect(within(detailPanel).getByText('100')).toBeInTheDocument();
         expect(within(detailPanel).getByText('C:\\Program Files\\nodejs\\node.exe')).toBeInTheDocument();

@@ -34,6 +34,10 @@ export function GetProtectionSettings() {
   return window['go']['main']['App']['GetProtectionSettings']();
 }
 
+export function GetRecentOperationLogsForResource(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetRecentOperationLogsForResource'](arg1, arg2, arg3);
+}
+
 export function GetSystemResourceInfo() {
   return window['go']['main']['App']['GetSystemResourceInfo']();
 }

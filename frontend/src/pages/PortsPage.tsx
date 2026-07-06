@@ -1,7 +1,8 @@
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useCallback, useMemo, useState} from 'react';
 import type {KeyboardEvent} from 'react';
 import StatusMessage from '../components/StatusMessage';
-import {loadOperationLogs} from '../services/logs';
+import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
+import {loadRecentOperationLogsForResource} from '../services/logs';
 import {isCommonDevelopmentPort, killProcessByPort, loadPortList} from '../services/ports';
 import type {Translator} from '../services/i18n';
 import type {OperationLog} from '../types/logs';
@@ -49,20 +50,17 @@ function PortsPage({page, t}: PortsPageProps) {
         }
     }, [t]);
 
-    useEffect(() => {
-        void loadPorts(true);
-        const intervalId = window.setInterval(() => {
-            void loadPorts(false);
-        }, portRefreshIntervalMs);
+    useSequentialAutoRefresh(loadPorts, portRefreshIntervalMs);
 
-        return () => window.clearInterval(intervalId);
-    }, [loadPorts]);
-
-    const loadRelatedLogs = useCallback(async () => {
+    const loadRelatedLogs = useCallback(async (port: PortInfo) => {
         setLogsErrorMessage('');
 
         try {
-            setOperationLogs(await loadOperationLogs());
+            setOperationLogs(await loadRecentOperationLogsForResource({
+                pid: port.pid,
+                processName: port.processName,
+                ports: [port.port],
+            }));
         } catch {
             setOperationLogs([]);
             setLogsErrorMessage(t('logs.error'));
@@ -72,11 +70,12 @@ function PortsPage({page, t}: PortsPageProps) {
     const openPortDetail = (port: PortInfo) => {
         setOperationMessage('');
         setSelectedPort(port);
-        void loadRelatedLogs();
+        void loadRelatedLogs(port);
     };
 
     const closePortDetail = () => {
         setSelectedPort(null);
+        setOperationLogs([]);
         setLogsErrorMessage('');
     };
 
@@ -108,8 +107,9 @@ function PortsPage({page, t}: PortsPageProps) {
                 await loadPorts(false);
                 if (selectedPort && samePort(selectedPort, portToKill)) {
                     closePortDetail();
+                } else if (selectedPort) {
+                    await loadRelatedLogs(selectedPort);
                 }
-                await loadRelatedLogs();
             }
         } catch {
             setOperationMessage(t('processes.killError'));
@@ -157,9 +157,7 @@ function PortsPage({page, t}: PortsPageProps) {
             return [];
         }
 
-        return operationLogs
-            .filter((log) => isRelatedPortLog(log, selectedPort))
-            .slice(0, 5);
+        return operationLogs.slice(0, 5);
     }, [operationLogs, selectedPort]);
 
     return (
@@ -471,17 +469,6 @@ function portRowKey(port: PortInfo): string {
 
 function samePort(left: PortInfo, right: PortInfo): boolean {
     return portRowKey(left) === portRowKey(right);
-}
-
-function isRelatedPortLog(log: OperationLog, port: PortInfo): boolean {
-    if (log.port === port.port) {
-        return true;
-    }
-    if (log.pid === port.pid) {
-        return true;
-    }
-
-    return log.processName !== '' && log.processName === port.processName;
 }
 
 function formatDetailCreatedAt(value: string): string {

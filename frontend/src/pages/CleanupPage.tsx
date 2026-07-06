@@ -1,8 +1,9 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import type {KeyboardEvent} from 'react';
 import StatusMessage from '../components/StatusMessage';
+import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
 import {buildCleanupCandidates} from '../services/cleanup';
-import {loadOperationLogs} from '../services/logs';
+import {loadRecentOperationLogsForResource} from '../services/logs';
 import {isCommonDevelopmentPort, loadPortList} from '../services/ports';
 import {killProcessByPID, loadProcessList} from '../services/processes';
 import {formatMemorySize, formatPercent, isHighMemoryUsage} from '../services/systemResources';
@@ -58,14 +59,7 @@ function CleanupPage({page, t}: CleanupPageProps) {
         }
     }, [t]);
 
-    useEffect(() => {
-        void loadCleanupData(true);
-        const intervalId = window.setInterval(() => {
-            void loadCleanupData(false);
-        }, cleanupRefreshIntervalMs);
-
-        return () => window.clearInterval(intervalId);
-    }, [loadCleanupData]);
+    useSequentialAutoRefresh(loadCleanupData, cleanupRefreshIntervalMs);
 
     const candidates = useMemo(() => {
         return buildCleanupCandidates(processes, ports);
@@ -114,9 +108,7 @@ function CleanupPage({page, t}: CleanupPageProps) {
             return [];
         }
 
-        return operationLogs
-            .filter((log) => isRelatedCleanupLog(log, selectedCandidate))
-            .slice(0, 5);
+        return operationLogs.slice(0, 5);
     }, [operationLogs, selectedCandidate]);
 
     useEffect(() => {
@@ -125,15 +117,20 @@ function CleanupPage({page, t}: CleanupPageProps) {
         }
         if (!candidates.some((candidate) => candidate.pid === selectedDetailPID)) {
             setSelectedDetailPID(null);
+            setOperationLogs([]);
             setLogsErrorMessage('');
         }
     }, [candidates, selectedDetailPID]);
 
-    const loadRelatedLogs = useCallback(async () => {
+    const loadRelatedLogs = useCallback(async (candidate: CleanupCandidate) => {
         setLogsErrorMessage('');
 
         try {
-            setOperationLogs(await loadOperationLogs());
+            setOperationLogs(await loadRecentOperationLogsForResource({
+                pid: candidate.pid,
+                processName: candidate.name,
+                ports: candidate.ports,
+            }));
         } catch {
             setOperationLogs([]);
             setLogsErrorMessage(t('logs.error'));
@@ -143,11 +140,12 @@ function CleanupPage({page, t}: CleanupPageProps) {
     const openCleanupDetail = (candidate: CleanupCandidate) => {
         setOperationMessage('');
         setSelectedDetailPID(candidate.pid);
-        void loadRelatedLogs();
+        void loadRelatedLogs(candidate);
     };
 
     const closeCleanupDetail = () => {
         setSelectedDetailPID(null);
+        setOperationLogs([]);
         setLogsErrorMessage('');
     };
 
@@ -227,9 +225,10 @@ function CleanupPage({page, t}: CleanupPageProps) {
                 });
                 if (selectedDetailPID === target.pid) {
                     closeCleanupDetail();
+                } else if (selectedCandidate) {
+                    await loadRelatedLogs(selectedCandidate);
                 }
                 await loadCleanupData(false);
-                await loadRelatedLogs();
             }
         } catch {
             setOperationMessage(t('processes.killError'));
@@ -269,7 +268,9 @@ function CleanupPage({page, t}: CleanupPageProps) {
 
         try {
             await loadCleanupData(false);
-            await loadRelatedLogs();
+            if (selectedCandidate) {
+                await loadRelatedLogs(selectedCandidate);
+            }
         } finally {
             setIsKilling(false);
         }
@@ -662,17 +663,6 @@ function cleanupRowClassName(candidate: CleanupCandidate, isSelected = false): s
     }
 
     return classNames.length > 0 ? classNames.join(' ') : undefined;
-}
-
-function isRelatedCleanupLog(log: OperationLog, candidate: CleanupCandidate): boolean {
-    if (log.pid === candidate.pid) {
-        return true;
-    }
-    if (candidate.ports.includes(log.port)) {
-        return true;
-    }
-
-    return log.processName !== '' && log.processName === candidate.name;
 }
 
 function formatDetailCreatedAt(value: string): string {

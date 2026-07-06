@@ -261,6 +261,17 @@ func (a *App) GetOperationLogs() ([]config.OperationLog, error) {
 	return store.GetOperationLogs(a.appContext())
 }
 
+// GetRecentOperationLogsForResource returns bounded logs related to one detail target.
+func (a *App) GetRecentOperationLogsForResource(pid int, processName string, ports []int) ([]config.OperationLog, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return nil, err
+	}
+	defer store.Close()
+
+	return store.GetRecentOperationLogsForResource(a.appContext(), pid, processName, ports, processdetail.RecentLogLimit())
+}
+
 func (a *App) appContext() context.Context {
 	if a.ctx == nil {
 		return context.Background()

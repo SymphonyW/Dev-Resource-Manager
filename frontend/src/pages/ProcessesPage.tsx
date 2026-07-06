@@ -1,6 +1,7 @@
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useCallback, useMemo, useState} from 'react';
 import type {KeyboardEvent} from 'react';
 import StatusMessage from '../components/StatusMessage';
+import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
 import {formatMemorySize, formatPercent, isHighMemoryUsage} from '../services/systemResources';
 import {killProcessByPID, loadProcessDetail, loadProcessList} from '../services/processes';
 import type {Translator} from '../services/i18n';
@@ -55,14 +56,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
         }
     }, [t]);
 
-    useEffect(() => {
-        void loadProcesses(true);
-        const intervalId = window.setInterval(() => {
-            void loadProcesses(false);
-        }, processRefreshIntervalMs);
-
-        return () => window.clearInterval(intervalId);
-    }, [loadProcesses]);
+    useSequentialAutoRefresh(loadProcesses, processRefreshIntervalMs);
 
     const loadDetail = useCallback(async (pid: number) => {
         setIsDetailLoading(true);
