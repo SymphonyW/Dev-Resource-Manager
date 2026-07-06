@@ -309,7 +309,7 @@ function CleanupPage({page, t}: CleanupPageProps) {
             )}
 
             {candidates.length > 0 && (
-                <div className="process-detail-layout has-detail">
+                <div className={selectedCandidate ? 'process-detail-layout has-detail' : 'process-detail-layout'}>
                     <div className="process-table-wrap compact-table-wrap">
                         <table className="process-table cleanup-table compact-data-table" aria-label={t('table.cleanupList')}>
                             <thead>
@@ -367,6 +367,7 @@ function CleanupPage({page, t}: CleanupPageProps) {
                         </table>
                     </div>
 
+                    {selectedCandidate && (
                     <aside
                         aria-label={t('detail.cleanup.aria')}
                         className="process-detail-drawer"
@@ -374,108 +375,99 @@ function CleanupPage({page, t}: CleanupPageProps) {
                     >
                         <div className="detail-drawer-header">
                             <div>
-                                <p className="detail-drawer-kicker">{selectedCandidate ? `${t('field.pid')} ${selectedCandidate.pid}` : t('detail.cleanup.aria')}</p>
-                                <h2>{selectedCandidate ? `${selectedCandidate.name || t('common.unknown')} PID ${selectedCandidate.pid}` : t('detail.cleanup.aria')}</h2>
+                                <p className="detail-drawer-kicker">{t('field.pid')} {selectedCandidate.pid}</p>
+                                <h2>{selectedCandidate.name || t('common.unknown')} PID {selectedCandidate.pid}</h2>
                             </div>
-                            {selectedCandidate && (
-                                <button
-                                    aria-label={t('common.close')}
-                                    className="dialog-close-button"
-                                    type="button"
-                                    onClick={closeCleanupDetail}
-                                    disabled={isKilling}
-                                >
-                                    {t('common.close')}
-                                </button>
-                            )}
+                            <button
+                                aria-label={t('common.close')}
+                                className="dialog-close-button"
+                                type="button"
+                                onClick={closeCleanupDetail}
+                                disabled={isKilling}
+                            >
+                                {t('common.close')}
+                            </button>
                         </div>
 
-                        {!selectedCandidate && (
-                            <div className="detail-drawer-empty">
-                                <p>{t('detail.cleanup.empty')}</p>
+                        <div className="detail-drawer-body">
+                            <div className="detail-badge-row">
+                                <span className={selectedCandidate.isProtected ? 'protected-badge' : 'standard-badge'}>
+                                    {selectedCandidate.isProtected ? t('badge.protected') : t('badge.standard')}
+                                </span>
+                                <span className="protocol-badge">{t('detail.developerRelated')}</span>
                             </div>
-                        )}
 
-                        {selectedCandidate && (
-                            <div className="detail-drawer-body">
-                                <div className="detail-badge-row">
-                                    <span className={selectedCandidate.isProtected ? 'protected-badge' : 'standard-badge'}>
-                                        {selectedCandidate.isProtected ? t('badge.protected') : t('badge.standard')}
-                                    </span>
-                                    <span className="protocol-badge">{t('detail.developerRelated')}</span>
+                            <dl className="detail-field-list">
+                                <div>
+                                    <dt>{t('field.pid')}</dt>
+                                    <dd className="mono">{selectedCandidate.pid}</dd>
                                 </div>
-
-                                <dl className="detail-field-list">
-                                    <div>
-                                        <dt>{t('field.pid')}</dt>
-                                        <dd className="mono">{selectedCandidate.pid}</dd>
-                                    </div>
-                                    <div>
-                                        <dt>{t('field.processName')}</dt>
-                                        <dd>{selectedCandidate.name || t('common.unknown')}</dd>
-                                    </div>
-                                    <div>
-                                        <dt>{t('field.match')}</dt>
-                                        <dd>{selectedCandidate.match || t('common.unavailable')}</dd>
-                                    </div>
-                                    <div>
-                                        <dt>{t('field.path')}</dt>
-                                        <dd>{selectedCandidate.path || t('common.unavailable')}</dd>
-                                    </div>
-                                    <div>
-                                        <dt>{t('field.command')}</dt>
-                                        <dd>{selectedCandidate.commandLine || t('common.unavailable')}</dd>
-                                    </div>
-                                    <div>
-                                        <dt>{t('field.cpu')}</dt>
-                                        <dd className="mono">{formatPercent(selectedCandidate.cpuPercent)}</dd>
-                                    </div>
-                                    <div>
-                                        <dt>{t('field.memory')}</dt>
-                                        <dd className="mono">{formatMemorySize(selectedCandidate.memoryBytes)}</dd>
-                                    </div>
-                                </dl>
-
-                                <div className="detail-section">
-                                    <div className="detail-section-header">
-                                        <h3>{t('field.ports')}</h3>
-                                        <span className="settings-count">{selectedCandidatePorts.length}</span>
-                                    </div>
-                                    {selectedCandidatePorts.length === 0 && (
-                                        <p className="detail-empty">{t('detail.noPorts')}</p>
-                                    )}
-                                    {selectedCandidatePorts.length > 0 && (
-                                        <ul className="detail-port-list">
-                                            {selectedCandidatePorts.map((port) => (
-                                                <li key={`${port.protocol}-${port.port}-${port.status}`}>
-                                                    <span className="mono">{port.port}</span>
-                                                    <span className="protocol-badge">{port.protocol || t('common.unknown')}</span>
-                                                    <span className="mono muted-cell">{port.status || t('common.unknown')}</span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
+                                <div>
+                                    <dt>{t('field.processName')}</dt>
+                                    <dd>{selectedCandidate.name || t('common.unknown')}</dd>
                                 </div>
-
-                                <CleanupRelatedLogs
-                                    logs={relatedLogs}
-                                    logsErrorMessage={logsErrorMessage}
-                                    t={t}
-                                />
-
-                                <div className="detail-actions">
-                                    <button
-                                        className="danger-button"
-                                        type="button"
-                                        disabled={selectedCandidate.isProtected || isKilling}
-                                        onClick={() => openSingleKillConfirmation(selectedCandidate)}
-                                    >
-                                        {t('terminate.process')}
-                                    </button>
+                                <div>
+                                    <dt>{t('field.match')}</dt>
+                                    <dd>{selectedCandidate.match || t('common.unavailable')}</dd>
                                 </div>
+                                <div>
+                                    <dt>{t('field.path')}</dt>
+                                    <dd>{selectedCandidate.path || t('common.unavailable')}</dd>
+                                </div>
+                                <div>
+                                    <dt>{t('field.command')}</dt>
+                                    <dd>{selectedCandidate.commandLine || t('common.unavailable')}</dd>
+                                </div>
+                                <div>
+                                    <dt>{t('field.cpu')}</dt>
+                                    <dd className="mono">{formatPercent(selectedCandidate.cpuPercent)}</dd>
+                                </div>
+                                <div>
+                                    <dt>{t('field.memory')}</dt>
+                                    <dd className="mono">{formatMemorySize(selectedCandidate.memoryBytes)}</dd>
+                                </div>
+                            </dl>
+
+                            <div className="detail-section">
+                                <div className="detail-section-header">
+                                    <h3>{t('field.ports')}</h3>
+                                    <span className="settings-count">{selectedCandidatePorts.length}</span>
+                                </div>
+                                {selectedCandidatePorts.length === 0 && (
+                                    <p className="detail-empty">{t('detail.noPorts')}</p>
+                                )}
+                                {selectedCandidatePorts.length > 0 && (
+                                    <ul className="detail-port-list">
+                                        {selectedCandidatePorts.map((port) => (
+                                            <li key={`${port.protocol}-${port.port}-${port.status}`}>
+                                                <span className="mono">{port.port}</span>
+                                                <span className="protocol-badge">{port.protocol || t('common.unknown')}</span>
+                                                <span className="mono muted-cell">{port.status || t('common.unknown')}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                             </div>
-                        )}
+
+                            <CleanupRelatedLogs
+                                logs={relatedLogs}
+                                logsErrorMessage={logsErrorMessage}
+                                t={t}
+                            />
+
+                            <div className="detail-actions">
+                                <button
+                                    className="danger-button"
+                                    type="button"
+                                    disabled={selectedCandidate.isProtected || isKilling}
+                                    onClick={() => openSingleKillConfirmation(selectedCandidate)}
+                                >
+                                    {t('terminate.process')}
+                                </button>
+                            </div>
+                        </div>
                     </aside>
+                    )}
                 </div>
             )}
 

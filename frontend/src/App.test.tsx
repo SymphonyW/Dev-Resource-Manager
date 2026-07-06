@@ -416,14 +416,13 @@ describe('App layout navigation', () => {
         expect(screen.getAllByText('Protected').length).toBeGreaterThan(1);
 
         const table = screen.getByRole('table', {name: 'Process list'});
-        const detailPanel = screen.getByRole('complementary', {name: 'Process detail'});
         const nodeRow = screen.getByText('node.exe').closest('tr');
 
         expect(nodeRow).not.toBeNull();
         expect(nodeRow).toHaveAttribute('tabindex', '0');
         expect(within(table).queryByRole('button', {name: 'Details'})).not.toBeInTheDocument();
         expect(within(table).queryByRole('button', {name: 'End Process'})).not.toBeInTheDocument();
-        expect(detailPanel).toHaveTextContent('Select a process row to view details.');
+        expect(screen.queryByRole('complementary', {name: 'Process detail'})).not.toBeInTheDocument();
     });
 
     it('keeps long process commands visually constrained while preserving full command text', async () => {
@@ -465,7 +464,7 @@ describe('App layout navigation', () => {
 
         fireEvent.click(within(drawer).getByRole('button', {name: 'Close'}));
 
-        expect(screen.getByRole('complementary', {name: 'Process detail'})).toHaveTextContent('Select a process row to view details.');
+        expect(screen.queryByRole('complementary', {name: 'Process detail'})).not.toBeInTheDocument();
         expect(screen.getByLabelText('Process name')).toHaveValue('node');
     });
 
@@ -561,7 +560,6 @@ describe('App layout navigation', () => {
         expect(screen.getAllByText('Dev port')).toHaveLength(2);
 
         const table = screen.getByRole('table', {name: 'Port list'});
-        const detailPanel = screen.getByRole('complementary', {name: 'Port detail'});
         const nodeRow = screen.getByText('node.exe').closest('tr');
         const protectedRow = screen.getByText('svchost.exe').closest('tr');
 
@@ -569,10 +567,11 @@ describe('App layout navigation', () => {
         expect(protectedRow).not.toBeNull();
         expect(nodeRow).toHaveAttribute('tabindex', '0');
         expect(within(table).queryByRole('button', {name: 'End Occupancy'})).not.toBeInTheDocument();
-        expect(detailPanel).toHaveTextContent('Select a port row to view details.');
+        expect(screen.queryByRole('complementary', {name: 'Port detail'})).not.toBeInTheDocument();
 
         fireEvent.click(nodeRow as HTMLTableRowElement);
 
+        const detailPanel = screen.getByRole('complementary', {name: 'Port detail'});
         expect(nodeRow).toHaveAttribute('aria-selected', 'true');
         expect(within(detailPanel).getByText('3000')).toBeInTheDocument();
         expect(within(detailPanel).getByText('TCP')).toBeInTheDocument();
@@ -706,11 +705,10 @@ describe('App layout navigation', () => {
         expect(screen.getByText('3000')).toBeInTheDocument();
         expect(screen.getByText('5432')).toBeInTheDocument();
 
-        const detailPanel = screen.getByRole('complementary', {name: 'Cleanup detail'});
         const nodeRow = screen.getByText('node.exe').closest('tr');
         const protectedRow = screen.getByText('vmmem').closest('tr');
 
-        expect(detailPanel).toHaveTextContent('Select a cleanup row to view details.');
+        expect(screen.queryByRole('complementary', {name: 'Cleanup detail'})).not.toBeInTheDocument();
         expect(nodeRow).not.toBeNull();
         expect(protectedRow).not.toBeNull();
         expect(nodeRow).toHaveAttribute('tabindex', '0');
@@ -719,6 +717,7 @@ describe('App layout navigation', () => {
 
         fireEvent.click(nodeRow as HTMLTableRowElement);
 
+        const detailPanel = screen.getByRole('complementary', {name: 'Cleanup detail'});
         expect(nodeRow).toHaveAttribute('aria-selected', 'true');
         expect(within(detailPanel).getByRole('heading', {name: 'node.exe PID 100'})).toBeInTheDocument();
         expect(within(detailPanel).getByText('100')).toBeInTheDocument();

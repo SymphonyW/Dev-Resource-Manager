@@ -222,64 +222,63 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
             )}
 
             {visibleProcesses.length > 0 && (
-                <div className="process-detail-layout has-detail">
-                    {visibleProcesses.length > 0 && (
-                        <div className="process-table-wrap compact-table-wrap">
-                            <table className="process-table process-list-table compact-data-table" aria-label={t('table.processList')}>
-                                <thead>
-                                    <tr>
-                                        <th>{t('field.pid')}</th>
-                                        <th>{t('field.processName')}</th>
-                                        <th>{t('field.path')}</th>
-                                        <th>{t('field.command')}</th>
-                                        <th>{t('field.cpu')}</th>
-                                        <th>{t('field.memory')}</th>
-                                        <th>{t('field.user')}</th>
-                                        <th>{t('field.protected')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {visibleProcesses.map((process) => {
-                                        const commandLine = process.commandLine || t('common.unavailable');
-                                        const path = process.path || t('common.unavailable');
-                                        const isSelected = selectedDetailPID === process.pid;
+                <div className={selectedDetailPID !== null ? 'process-detail-layout has-detail' : 'process-detail-layout'}>
+                    <div className="process-table-wrap compact-table-wrap">
+                        <table className="process-table process-list-table compact-data-table" aria-label={t('table.processList')}>
+                            <thead>
+                                <tr>
+                                    <th>{t('field.pid')}</th>
+                                    <th>{t('field.processName')}</th>
+                                    <th>{t('field.path')}</th>
+                                    <th>{t('field.command')}</th>
+                                    <th>{t('field.cpu')}</th>
+                                    <th>{t('field.memory')}</th>
+                                    <th>{t('field.user')}</th>
+                                    <th>{t('field.protected')}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {visibleProcesses.map((process) => {
+                                    const commandLine = process.commandLine || t('common.unavailable');
+                                    const path = process.path || t('common.unavailable');
+                                    const isSelected = selectedDetailPID === process.pid;
 
-                                        return (
-                                            <tr
-                                                key={process.pid}
-                                                aria-selected={isSelected}
-                                                className={processRowClassName(process, isSelected)}
-                                                onClick={() => openProcessDetail(process)}
-                                                onKeyDown={(event) => handleProcessRowKeyDown(event, process)}
-                                                tabIndex={0}
-                                            >
-                                                <td className="mono">{process.pid}</td>
-                                                <td data-testid="process-name">{process.name || t('common.unknown')}</td>
-                                                <td className="muted-cell compact-path-cell" title={path}>{path}</td>
-                                                <td className="muted-cell" title={commandLine}>
-                                                    <span className="command-cell" title={commandLine}>{commandLine}</span>
-                                                </td>
-                                                <td className="mono metric-cell">{formatPercent(process.cpuPercent)}</td>
-                                                <td className="mono metric-cell">
-                                                    {formatMemorySize(process.memoryBytes)}
-                                                    {isHighMemoryUsage(process.memoryBytes) && <span className="memory-badge">{t('badge.high')}</span>}
-                                                </td>
-                                                <td className="compact-user-cell" title={process.user || t('common.unavailable')}>
-                                                    {process.user || t('common.unavailable')}
-                                                </td>
-                                                <td>
-                                                    <span className={process.isProtected ? 'protected-badge' : 'standard-badge'}>
-                                                        {process.isProtected ? t('badge.protected') : t('badge.standard')}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                                    return (
+                                        <tr
+                                            key={process.pid}
+                                            aria-selected={isSelected}
+                                            className={processRowClassName(process, isSelected)}
+                                            onClick={() => openProcessDetail(process)}
+                                            onKeyDown={(event) => handleProcessRowKeyDown(event, process)}
+                                            tabIndex={0}
+                                        >
+                                            <td className="mono">{process.pid}</td>
+                                            <td data-testid="process-name">{process.name || t('common.unknown')}</td>
+                                            <td className="muted-cell compact-path-cell" title={path}>{path}</td>
+                                            <td className="muted-cell" title={commandLine}>
+                                                <span className="command-cell" title={commandLine}>{commandLine}</span>
+                                            </td>
+                                            <td className="mono metric-cell">{formatPercent(process.cpuPercent)}</td>
+                                            <td className="mono metric-cell">
+                                                {formatMemorySize(process.memoryBytes)}
+                                                {isHighMemoryUsage(process.memoryBytes) && <span className="memory-badge">{t('badge.high')}</span>}
+                                            </td>
+                                            <td className="compact-user-cell" title={process.user || t('common.unavailable')}>
+                                                {process.user || t('common.unavailable')}
+                                            </td>
+                                            <td>
+                                                <span className={process.isProtected ? 'protected-badge' : 'standard-badge'}>
+                                                    {process.isProtected ? t('badge.protected') : t('badge.standard')}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
 
+                    {selectedDetailPID !== null && (
                     <aside
                         aria-label={t('detail.process.aria')}
                         className="process-detail-drawer"
@@ -306,11 +305,6 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                         {detailErrorMessage && <StatusMessage variant="error">{detailErrorMessage}</StatusMessage>}
                         {isDetailLoading && !processDetail && (
                             <StatusMessage variant="loading">{t('detail.process.loading')}</StatusMessage>
-                        )}
-                        {selectedDetailPID === null && (
-                            <div className="detail-drawer-empty">
-                                <p>{t('detail.process.empty')}</p>
-                            </div>
                         )}
 
                         {processDetail && (
@@ -417,6 +411,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                             </div>
                         )}
                     </aside>
+                    )}
                 </div>
             )}
 

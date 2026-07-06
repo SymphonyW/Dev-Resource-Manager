@@ -222,7 +222,7 @@ function PortsPage({page, t}: PortsPageProps) {
             )}
 
             {visiblePorts.length > 0 && (
-                <div className="process-detail-layout has-detail">
+                <div className={selectedPort ? 'process-detail-layout has-detail' : 'process-detail-layout'}>
                     <div className="process-table-wrap compact-table-wrap">
                         <table className="process-table port-table compact-data-table" aria-label={t('table.portList')}>
                             <thead>
@@ -267,6 +267,7 @@ function PortsPage({page, t}: PortsPageProps) {
                         </table>
                     </div>
 
+                    {selectedPort && (
                     <aside
                         aria-label={t('detail.port.aria')}
                         className="process-detail-drawer"
@@ -274,85 +275,76 @@ function PortsPage({page, t}: PortsPageProps) {
                     >
                         <div className="detail-drawer-header">
                             <div>
-                                <p className="detail-drawer-kicker">{selectedPort ? `${t('field.port')} ${selectedPort.port}` : t('detail.port.aria')}</p>
-                                <h2>{selectedPort ? `${selectedPort.processName || t('common.unknown')} :${selectedPort.port}` : t('detail.port.aria')}</h2>
+                                <p className="detail-drawer-kicker">{t('field.port')} {selectedPort.port}</p>
+                                <h2>{selectedPort.processName || t('common.unknown')} :{selectedPort.port}</h2>
                             </div>
-                            {selectedPort && (
-                                <button
-                                    aria-label={t('common.close')}
-                                    className="dialog-close-button"
-                                    type="button"
-                                    onClick={closePortDetail}
-                                    disabled={isKilling}
-                                >
-                                    {t('common.close')}
-                                </button>
-                            )}
+                            <button
+                                aria-label={t('common.close')}
+                                className="dialog-close-button"
+                                type="button"
+                                onClick={closePortDetail}
+                                disabled={isKilling}
+                            >
+                                {t('common.close')}
+                            </button>
                         </div>
 
-                        {!selectedPort && (
-                            <div className="detail-drawer-empty">
-                                <p>{t('detail.port.empty')}</p>
+                        <div className="detail-drawer-body">
+                            <div className="detail-badge-row">
+                                <span className={selectedPort.isProtected ? 'protected-badge' : 'standard-badge'}>
+                                    {selectedPort.isProtected ? t('badge.protected') : t('badge.standard')}
+                                </span>
+                                {isCommonDevelopmentPort(selectedPort.port) && (
+                                    <span className="protocol-badge">{t('badge.devPort')}</span>
+                                )}
                             </div>
-                        )}
 
-                        {selectedPort && (
-                            <div className="detail-drawer-body">
-                                <div className="detail-badge-row">
-                                    <span className={selectedPort.isProtected ? 'protected-badge' : 'standard-badge'}>
-                                        {selectedPort.isProtected ? t('badge.protected') : t('badge.standard')}
-                                    </span>
-                                    {isCommonDevelopmentPort(selectedPort.port) && (
-                                        <span className="protocol-badge">{t('badge.devPort')}</span>
-                                    )}
+                            <dl className="detail-field-list">
+                                <div>
+                                    <dt>{t('field.port')}</dt>
+                                    <dd className="mono">{selectedPort.port}</dd>
                                 </div>
-
-                                <dl className="detail-field-list">
-                                    <div>
-                                        <dt>{t('field.port')}</dt>
-                                        <dd className="mono">{selectedPort.port}</dd>
-                                    </div>
-                                    <div>
-                                        <dt>{t('field.protocol')}</dt>
-                                        <dd>{selectedPort.protocol || t('common.unknown')}</dd>
-                                    </div>
-                                    <div>
-                                        <dt>{t('field.status')}</dt>
-                                        <dd className="mono">{selectedPort.status || t('common.unknown')}</dd>
-                                    </div>
-                                    <div>
-                                        <dt>{t('field.pid')}</dt>
-                                        <dd className="mono">{selectedPort.pid}</dd>
-                                    </div>
-                                    <div>
-                                        <dt>{t('field.processName')}</dt>
-                                        <dd>{selectedPort.processName || t('common.unknown')}</dd>
-                                    </div>
-                                    <div>
-                                        <dt>{t('field.processPath')}</dt>
-                                        <dd>{selectedPort.processPath || t('common.unavailable')}</dd>
-                                    </div>
-                                </dl>
-
-                                <PortRelatedLogs
-                                    logs={relatedLogs}
-                                    logsErrorMessage={logsErrorMessage}
-                                    t={t}
-                                />
-
-                                <div className="detail-actions">
-                                    <button
-                                        className="danger-button"
-                                        type="button"
-                                        disabled={selectedPort.isProtected || isKilling}
-                                        onClick={() => openKillConfirmation(selectedPort)}
-                                    >
-                                        {t('terminate.occupancy')}
-                                    </button>
+                                <div>
+                                    <dt>{t('field.protocol')}</dt>
+                                    <dd>{selectedPort.protocol || t('common.unknown')}</dd>
                                 </div>
+                                <div>
+                                    <dt>{t('field.status')}</dt>
+                                    <dd className="mono">{selectedPort.status || t('common.unknown')}</dd>
+                                </div>
+                                <div>
+                                    <dt>{t('field.pid')}</dt>
+                                    <dd className="mono">{selectedPort.pid}</dd>
+                                </div>
+                                <div>
+                                    <dt>{t('field.processName')}</dt>
+                                    <dd>{selectedPort.processName || t('common.unknown')}</dd>
+                                </div>
+                                <div>
+                                    <dt>{t('field.processPath')}</dt>
+                                    <dd>{selectedPort.processPath || t('common.unavailable')}</dd>
+                                </div>
+                            </dl>
+
+                            <PortRelatedLogs
+                                logs={relatedLogs}
+                                logsErrorMessage={logsErrorMessage}
+                                t={t}
+                            />
+
+                            <div className="detail-actions">
+                                <button
+                                    className="danger-button"
+                                    type="button"
+                                    disabled={selectedPort.isProtected || isKilling}
+                                    onClick={() => openKillConfirmation(selectedPort)}
+                                >
+                                    {t('terminate.occupancy')}
+                                </button>
                             </div>
-                        )}
+                        </div>
                     </aside>
+                    )}
                 </div>
             )}
 
