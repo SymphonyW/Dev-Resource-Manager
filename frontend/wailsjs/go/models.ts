@@ -64,6 +64,7 @@ export namespace detail {
 	export class ProcessDetail {
 	    pid: number;
 	    processName: string;
+	    iconDataURL: string;
 	    executablePath: string;
 	    executablePathError: string;
 	    commandLine: string;
@@ -85,6 +86,7 @@ export namespace detail {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.pid = source["pid"];
 	        this.processName = source["processName"];
+	        this.iconDataURL = source["iconDataURL"];
 	        this.executablePath = source["executablePath"];
 	        this.executablePathError = source["executablePathError"];
 	        this.commandLine = source["commandLine"];
@@ -189,6 +191,7 @@ export namespace process {
 	export class Info {
 	    pid: number;
 	    name: string;
+	    iconDataURL: string;
 	    path: string;
 	    commandLine: string;
 	    user: string;
@@ -204,6 +207,7 @@ export namespace process {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.pid = source["pid"];
 	        this.name = source["name"];
+	        this.iconDataURL = source["iconDataURL"];
 	        this.path = source["path"];
 	        this.commandLine = source["commandLine"];
 	        this.user = source["user"];

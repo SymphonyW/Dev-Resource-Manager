@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import type {KeyboardEvent} from 'react';
+import ProcessNameCell from '../components/ProcessNameCell';
 import StatusMessage from '../components/StatusMessage';
 import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
 import {buildCleanupCandidates} from '../services/cleanup';
@@ -351,7 +352,13 @@ function CleanupPage({page, t}: CleanupPageProps) {
                                                 />
                                             </td>
                                             <td className="mono">{candidate.pid}</td>
-                                            <td data-testid="cleanup-process-name">{candidate.name || t('common.unknown')}</td>
+                                            <td data-testid="cleanup-process-name">
+                                                <ProcessNameCell
+                                                    iconDataURL={candidate.iconDataURL}
+                                                    name={candidate.name}
+                                                    fallbackName={t('common.unknown')}
+                                                />
+                                            </td>
                                             <td className="muted-cell compact-path-cell" title={candidate.path || t('common.unavailable')}>
                                                 {candidate.path || t('common.unavailable')}
                                             </td>

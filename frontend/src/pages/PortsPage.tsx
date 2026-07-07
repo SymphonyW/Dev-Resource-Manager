@@ -1,5 +1,6 @@
 import {useCallback, useMemo, useState} from 'react';
 import type {KeyboardEvent} from 'react';
+import ProcessNameCell from '../components/ProcessNameCell';
 import StatusMessage from '../components/StatusMessage';
 import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
 import {loadRecentOperationLogsForResource} from '../services/logs';
@@ -267,7 +268,13 @@ function PortsPage({page, t}: PortsPageProps) {
                                             tabIndex={0}
                                         >
                                             <td className="mono">{port.pid}</td>
-                                            <td data-testid="port-process-name">{processName}</td>
+                                            <td data-testid="port-process-name">
+                                                <ProcessNameCell
+                                                    iconDataURL={owner?.iconDataURL ?? ''}
+                                                    name={processName}
+                                                    fallbackName={t('common.unknown')}
+                                                />
+                                            </td>
                                             <td className="muted-cell compact-path-cell" title={processPath}>
                                                 {processPath}
                                             </td>

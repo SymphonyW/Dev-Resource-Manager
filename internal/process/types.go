@@ -4,6 +4,7 @@ package process
 type Info struct {
 	PID         int32   `json:"pid"`
 	Name        string  `json:"name"`
+	IconDataURL string  `json:"iconDataURL"`
 	Path        string  `json:"path"`
 	CommandLine string  `json:"commandLine"`
 	User        string  `json:"user"`

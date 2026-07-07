@@ -33,6 +33,7 @@ var developmentProcessKeywords = []string{
 type ProcessSnapshot struct {
 	PID                 int32
 	ProcessName         string
+	IconDataURL         string
 	ExecutablePath      string
 	ExecutablePathError string
 	CommandLine         string
@@ -53,6 +54,7 @@ type ProcessPort struct {
 type ProcessDetail struct {
 	PID                 int32                 `json:"pid"`
 	ProcessName         string                `json:"processName"`
+	IconDataURL         string                `json:"iconDataURL"`
 	ExecutablePath      string                `json:"executablePath"`
 	ExecutablePathError string                `json:"executablePathError"`
 	CommandLine         string                `json:"commandLine"`
@@ -72,6 +74,7 @@ func BuildProcessDetail(snapshot ProcessSnapshot, ports []portscanner.Info, logs
 	return ProcessDetail{
 		PID:                 snapshot.PID,
 		ProcessName:         strings.TrimSpace(snapshot.ProcessName),
+		IconDataURL:         strings.TrimSpace(snapshot.IconDataURL),
 		ExecutablePath:      strings.TrimSpace(snapshot.ExecutablePath),
 		ExecutablePathError: strings.TrimSpace(snapshot.ExecutablePathError),
 		CommandLine:         strings.TrimSpace(snapshot.CommandLine),

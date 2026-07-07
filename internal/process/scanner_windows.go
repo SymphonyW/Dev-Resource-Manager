@@ -62,6 +62,7 @@ func ListWithProtector(ctx context.Context, protector Protector) ([]Info, error)
 			if info.Name == "" {
 				info.Name = filepath.Base(path)
 			}
+			info.IconDataURL = IconDataURLForPath(info.Path)
 		}
 		if memory, err := process.MemoryInfoWithContext(ctx); err == nil && memory != nil {
 			info.MemoryBytes = memory.RSS

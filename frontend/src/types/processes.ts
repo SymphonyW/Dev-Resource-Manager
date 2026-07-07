@@ -3,6 +3,7 @@ import type {OperationLog} from './logs';
 export interface ProcessInfo {
     pid: number;
     name: string;
+    iconDataURL: string;
     path: string;
     commandLine: string;
     user: string;
@@ -20,6 +21,7 @@ export interface ProcessDetailPort {
 export interface ProcessDetail {
     pid: number;
     processName: string;
+    iconDataURL: string;
     executablePath: string;
     executablePathError: string;
     commandLine: string;

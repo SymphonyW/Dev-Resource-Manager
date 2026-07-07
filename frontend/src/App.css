@@ -20,7 +20,7 @@
     --danger-soft: #fff1f0;
     --shadow: 0 18px 44px rgba(37, 99, 235, 0.08);
     --resource-table-header-height: 34px;
-    --resource-table-row-height: 42px;
+    --resource-table-row-height: 38px;
 }
 
 .app-shell {
@@ -557,7 +557,7 @@ h1 {
 }
 
 .process-list-table th:nth-child(2) {
-    width: 132px;
+    width: 148px;
 }
 
 .process-list-table th:nth-child(3) {
@@ -590,7 +590,7 @@ h1 {
 }
 
 .port-table th:nth-child(2) {
-    width: 132px;
+    width: 148px;
 }
 
 .port-table th:nth-child(3) {
@@ -632,7 +632,7 @@ h1 {
 }
 
 .cleanup-table th:nth-child(3) {
-    width: 132px;
+    width: 148px;
 }
 
 .cleanup-table th:nth-child(4) {
@@ -798,6 +798,43 @@ h1 {
 .command-cell {
     display: block;
     max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.process-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.process-icon {
+    display: inline-flex;
+    flex: 0 0 18px;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: #eef4fb;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.process-icon img {
+    display: block;
+    width: 16px;
+    height: 16px;
+}
+
+.process-name-text {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
