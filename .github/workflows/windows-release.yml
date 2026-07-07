@@ -38,7 +38,15 @@ jobs:
 
       - name: Install NSIS
         shell: powershell
-        run: choco install nsis -y --no-progress
+        run: |
+          choco install nsis -y --no-progress
+          $nsisPath = "${env:ProgramFiles(x86)}\NSIS"
+          $makensis = Join-Path $nsisPath "makensis.exe"
+          if (-not (Test-Path $makensis)) {
+            throw "NSIS was installed, but makensis.exe was not found at $makensis"
+          }
+          $nsisPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          & $makensis /VERSION
 
       - name: Verify toolchain
         shell: powershell
