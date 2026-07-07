@@ -32,10 +32,13 @@ vi.mock('../wailsjs/go/main/App', () => ({
     KillProcessByPort: (port: number, protocol: string) => killProcessByPortMock(port, protocol),
 }));
 
+const nodeIconDataURL = 'data:image/png;base64,node-icon';
+
 const processRows = [
     {
         pid: 4,
         name: 'System',
+        iconDataURL: '',
         path: '',
         commandLine: '',
         user: '',
@@ -46,6 +49,7 @@ const processRows = [
     {
         pid: 100,
         name: 'node.exe',
+        iconDataURL: nodeIconDataURL,
         path: 'C:\\Program Files\\nodejs\\node.exe',
         commandLine: 'node server.js',
         user: 'DESKTOP\\dev',
@@ -56,6 +60,7 @@ const processRows = [
     {
         pid: 200,
         name: 'postgres.exe',
+        iconDataURL: '',
         path: 'C:\\PostgreSQL\\bin\\postgres.exe',
         commandLine: 'postgres -D data',
         user: 'DESKTOP\\postgres',
@@ -66,6 +71,7 @@ const processRows = [
     {
         pid: 500,
         name: 'vmmem',
+        iconDataURL: '',
         path: '',
         commandLine: '',
         user: 'NT AUTHORITY\\SYSTEM',
@@ -76,6 +82,7 @@ const processRows = [
     {
         pid: 600,
         name: 'chrome.exe',
+        iconDataURL: '',
         path: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
         commandLine: 'chrome.exe',
         user: 'DESKTOP\\dev',
@@ -164,6 +171,7 @@ const operationLogs = [
 const nodeProcessDetail = {
     pid: 100,
     processName: 'node.exe',
+    iconDataURL: nodeIconDataURL,
     executablePath: '',
     executablePathError: 'Unable to read executable path. Try running as administrator.',
     commandLine: 'node server.js',
@@ -430,6 +438,24 @@ describe('App layout navigation', () => {
         expect(within(table).queryByRole('button', {name: 'Details'})).not.toBeInTheDocument();
         expect(within(table).queryByRole('button', {name: 'End Process'})).not.toBeInTheDocument();
         expect(screen.queryByRole('complementary', {name: 'Process detail'})).not.toBeInTheDocument();
+    });
+
+    it('shows process icons with a fallback initial in process name cells', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+
+        const nodeRow = screen.getByText('node.exe').closest('tr');
+        const systemRow = screen.getByText('System').closest('tr');
+        expect(nodeRow).not.toBeNull();
+        expect(systemRow).not.toBeNull();
+
+        const nodeIcon = within(nodeRow as HTMLTableRowElement).getByRole('img', {name: 'node.exe icon'});
+        expect(nodeIcon.querySelector('img')).toHaveAttribute('src', nodeIconDataURL);
+
+        const fallbackIcon = within(systemRow as HTMLTableRowElement).getByRole('img', {name: 'System icon'});
+        expect(fallbackIcon).toHaveTextContent('S');
     });
 
     it('keeps long process commands visually constrained while preserving full command text', async () => {
@@ -825,11 +851,12 @@ describe('App layout navigation', () => {
 
     it('keeps data table rows at a fixed height with single-line cells', () => {
         expect(appStyles).toContain('--resource-table-header-height: 34px;');
-        expect(appStyles).toContain('--resource-table-row-height: 42px;');
+        expect(appStyles).toContain('--resource-table-row-height: 38px;');
         expect(appStyles).toMatch(/\.process-table th\s*\{[^}]*height: var\(--resource-table-header-height\);/s);
         expect(appStyles).toMatch(/\.process-table tbody tr\s*\{[^}]*height: var\(--resource-table-row-height\);/s);
         expect(appStyles).toMatch(/\.process-table td\s*\{[^}]*height: var\(--resource-table-row-height\);/s);
         expect(appStyles).toMatch(/\.command-cell\s*\{[^}]*white-space: nowrap;/s);
+        expect(appStyles).toMatch(/\.process-name-cell\s*\{[^}]*display: flex;/s);
     });
 
     it('confirms and ends selected Cleanup candidates through the logged PID operation', async () => {

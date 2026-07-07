@@ -12,6 +12,7 @@ func TestBuildProcessDetailAggregatesPortsLogsAndAccessWarnings(t *testing.T) {
 		ProcessSnapshot{
 			PID:                 100,
 			ProcessName:         "node.exe",
+			IconDataURL:         "data:image/png;base64,node-icon",
 			ExecutablePathError: "Unable to read executable path. Try running as administrator.",
 			CommandLineError:    "Unable to read command line. Try running as administrator.",
 			CPUPercent:          12.3,
@@ -35,6 +36,9 @@ func TestBuildProcessDetailAggregatesPortsLogsAndAccessWarnings(t *testing.T) {
 	}
 	if detail.ProcessName != "node.exe" {
 		t.Fatalf("expected node.exe, got %q", detail.ProcessName)
+	}
+	if detail.IconDataURL != "data:image/png;base64,node-icon" {
+		t.Fatalf("expected icon data URL to be preserved, got %q", detail.IconDataURL)
 	}
 	if detail.ExecutablePath != "" || detail.ExecutablePathError == "" {
 		t.Fatalf("expected explicit executable path error, got path=%q error=%q", detail.ExecutablePath, detail.ExecutablePathError)

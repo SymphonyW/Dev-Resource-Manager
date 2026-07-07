@@ -39,6 +39,7 @@ func ReadProcessSnapshot(ctx context.Context, pid int32, protector processscanne
 		if snapshot.ProcessName == "" {
 			snapshot.ProcessName = filepath.Base(snapshot.ExecutablePath)
 		}
+		snapshot.IconDataURL = processscanner.IconDataURLForPath(snapshot.ExecutablePath)
 	} else {
 		snapshot.ExecutablePathError = readFailureMessage("executable path", err)
 	}

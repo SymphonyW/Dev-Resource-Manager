@@ -1,5 +1,6 @@
 import {useCallback, useMemo, useState} from 'react';
 import type {KeyboardEvent} from 'react';
+import ProcessNameCell from '../components/ProcessNameCell';
 import StatusMessage from '../components/StatusMessage';
 import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
 import {formatMemorySize, formatPercent, isHighMemoryUsage} from '../services/systemResources';
@@ -257,7 +258,13 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                             tabIndex={0}
                                         >
                                             <td className="mono">{process.pid}</td>
-                                            <td data-testid="process-name">{process.name || t('common.unknown')}</td>
+                                            <td data-testid="process-name">
+                                                <ProcessNameCell
+                                                    iconDataURL={process.iconDataURL}
+                                                    name={process.name}
+                                                    fallbackName={t('common.unknown')}
+                                                />
+                                            </td>
                                             <td className="muted-cell compact-path-cell" title={path}>{path}</td>
                                             <td className="muted-cell" title={commandLine}>
                                                 <span className="command-cell" title={commandLine}>{commandLine}</span>
