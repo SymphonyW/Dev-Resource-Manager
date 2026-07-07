@@ -66,9 +66,10 @@ ManifestDPIAware true
 
 !insertmacro MUI_LANGUAGE "English" # Set the Language of the installer
 
-## The following two statements can be used to sign the installer and the uninstaller. The path to the binaries are provided in %1
-#!uninstfinalize 'signtool --file "%1"'
-#!finalize 'signtool --file "%1"'
+## Code signing placeholder. Keep certificates, passwords, tokens, and private keys outside the repository.
+## The path to the binaries is provided in %1. Wire these commands to CI secrets when a signing certificate is available.
+#!uninstfinalize 'signtool sign /fd sha256 /td sha256 /tr http://timestamp.digicert.com /f "%WINDOWS_SIGNING_CERT_PATH%" /p "%WINDOWS_SIGNING_CERT_PASSWORD%" "%1"'
+#!finalize 'signtool sign /fd sha256 /td sha256 /tr http://timestamp.digicert.com /f "%WINDOWS_SIGNING_CERT_PATH%" /p "%WINDOWS_SIGNING_CERT_PASSWORD%" "%1"'
 
 Name "${INFO_PRODUCTNAME}"
 OutFile "..\..\bin\${INFO_PROJECTNAME}-${ARCH}-installer.exe" # Name of the installer's file.

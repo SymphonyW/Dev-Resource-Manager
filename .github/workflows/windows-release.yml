@@ -1,0 +1,63 @@
+name: Windows Release Build
+
+on:
+  workflow_dispatch:
+
+env:
+  WAILS_VERSION: v2.12.0
+  NODE_VERSION: "22"
+
+jobs:
+  build-windows:
+    name: Build Windows unsigned package
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+
+      - name: Install NSIS
+        shell: powershell
+        run: choco install nsis -y --no-progress
+
+      - name: Verify toolchain
+        shell: powershell
+        run: |
+          go version
+          node --version
+          npm --version
+          wails version
+          makensis /VERSION
+
+      - name: Build Windows installer
+        shell: powershell
+        run: .\scripts\package-windows.ps1
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-resource-manager-windows-unsigned
+          path: |
+            build/bin/*.exe
+          if-no-files-found: error
+          retention-days: 14

@@ -2,7 +2,7 @@
 
 A Wails desktop application scaffolded with Go, React, TypeScript, and Vite.
 
-## Development
+## Run
 
 Run the desktop app with live reload:
 
@@ -10,10 +10,20 @@ Run the desktop app with live reload:
 wails dev
 ```
 
-## Build
+## Build / Release
 
-Build the desktop application:
+Build the Windows executable:
 
-```bash
-wails build
+```powershell
+.\scripts\build-windows.ps1
 ```
+
+Build the unsigned Windows installer:
+
+```powershell
+.\scripts\package-windows.ps1
+```
+
+GitHub Actions provides a manual **Windows Release Build** workflow that uploads the unsigned Windows build as an artifact.
+
+See [docs/release-windows.md](docs/release-windows.md) for environment setup, artifact locations, installer verification, unsigned-app notes, signing placeholders, and the GitHub Release flow.
