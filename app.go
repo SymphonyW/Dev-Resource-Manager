@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"dev-resource-manager/internal/config"
+	processdetail "dev-resource-manager/internal/detail"
 	portscanner "dev-resource-manager/internal/port"
 	processscanner "dev-resource-manager/internal/process"
+	"dev-resource-manager/internal/resource"
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
@@ -23,6 +25,10 @@ type SystemResourceInfo struct {
 	TotalMemoryBytes uint64  `json:"totalMemoryBytes"`
 	UsedMemoryBytes  uint64  `json:"usedMemoryBytes"`
 	FreeMemoryBytes  uint64  `json:"freeMemoryBytes"`
+	GPUPercent       float64 `json:"gpuPercent"`
+	TotalVRAMBytes   uint64  `json:"totalVRAMBytes"`
+	UsedVRAMBytes    uint64  `json:"usedVRAMBytes"`
+	FreeVRAMBytes    uint64  `json:"freeVRAMBytes"`
 	ProcessCount     int     `json:"processCount"`
 	PortCount        int     `json:"portCount"`
 }
@@ -70,6 +76,12 @@ func (a *App) GetSystemResourceInfo() SystemResourceInfo {
 		info.FreeMemoryBytes = 0
 	}
 
+	gpuInfo := resource.GetGPUInfo()
+	info.GPUPercent = gpuInfo.GPUPercent
+	info.TotalVRAMBytes = gpuInfo.TotalVRAMBytes
+	info.UsedVRAMBytes = gpuInfo.UsedVRAMBytes
+	info.FreeVRAMBytes = gpuInfo.FreeVRAMBytes
+
 	if pids, err := gopsprocess.Pids(); err == nil {
 		info.ProcessCount = len(pids)
 	} else {
@@ -113,6 +125,25 @@ func (a *App) GetProcessList() ([]processscanner.Info, error) {
 	return processes, nil
 }
 
+// GetProcessDetail returns a single process detail view with ports and recent logs.
+func (a *App) GetProcessDetail(pid int) (processdetail.ProcessDetail, error) {
+	ctx := a.appContext()
+	rules, err := a.loadProtectionRules(ctx)
+	if err != nil {
+		return processdetail.ProcessDetail{}, err
+	}
+
+	snapshot, err := processdetail.ReadProcessSnapshot(ctx, int32(pid), rules)
+	if err != nil {
+		return processdetail.ProcessDetail{}, err
+	}
+
+	ports, portsError := a.processDetailPorts(ctx, rules)
+	logs, logsError := a.processDetailLogs(ctx, pid, snapshot.ProcessName)
+
+	return processdetail.BuildProcessDetail(snapshot, ports, logs, portsError, logsError), nil
+}
+
 // GetPortList returns the current Windows TCP/UDP port occupancy list for the frontend.
 func (a *App) GetPortList() ([]portscanner.Info, error) {
 	ctx := a.appContext()
@@ -127,6 +158,30 @@ func (a *App) GetPortList() ([]portscanner.Info, error) {
 	}
 
 	return ports, nil
+}
+
+func (a *App) processDetailPorts(ctx context.Context, rules config.ProtectionRules) ([]portscanner.Info, string) {
+	ports, err := portscanner.ListWithProtector(ctx, rules)
+	if err != nil {
+		return nil, "Unable to load occupied ports for this process: " + err.Error()
+	}
+
+	return ports, ""
+}
+
+func (a *App) processDetailLogs(ctx context.Context, pid int, processName string) ([]config.OperationLog, string) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return nil, "Unable to open operation log store: " + err.Error()
+	}
+	defer store.Close()
+
+	logs, err := store.GetRecentOperationLogsForProcess(ctx, pid, processName, processdetail.RecentLogLimit())
+	if err != nil {
+		return nil, "Unable to load recent operation logs: " + err.Error()
+	}
+
+	return logs, ""
 }
 
 // KillProcessByPID ends a non-protected process by PID and returns an operation result.
@@ -204,6 +259,17 @@ func (a *App) GetOperationLogs() ([]config.OperationLog, error) {
 	defer store.Close()
 
 	return store.GetOperationLogs(a.appContext())
+}
+
+// GetRecentOperationLogsForResource returns bounded logs related to one detail target.
+func (a *App) GetRecentOperationLogsForResource(pid int, processName string, ports []int) ([]config.OperationLog, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return nil, err
+	}
+	defer store.Close()
+
+	return store.GetRecentOperationLogsForResource(a.appContext(), pid, processName, ports, processdetail.RecentLogLimit())
 }
 
 func (a *App) appContext() context.Context {

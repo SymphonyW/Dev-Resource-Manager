@@ -138,6 +138,137 @@ func TestOperationLogsAreStoredNewestFirst(t *testing.T) {
 	}
 }
 
+func TestOperationLogsReturnsMostRecentEntriesOnly(t *testing.T) {
+	ctx := context.Background()
+	store := newTestStore(t)
+
+	for i := 0; i < 205; i++ {
+		if err := store.AddOperationLog(ctx, OperationLogInput{
+			Action:      "kill_process_by_pid",
+			PID:         1000 + i,
+			ProcessName: "node.exe",
+			Result:      "success",
+			Message:     "Process node.exe ended.",
+		}); err != nil {
+			t.Fatalf("add operation log %d: %v", i, err)
+		}
+	}
+
+	logs, err := store.GetOperationLogs(ctx)
+	if err != nil {
+		t.Fatalf("get operation logs: %v", err)
+	}
+	if len(logs) != 200 {
+		t.Fatalf("expected 200 most recent logs, got %d", len(logs))
+	}
+	if logs[0].PID != 1204 {
+		t.Fatalf("expected newest log first, got PID %d", logs[0].PID)
+	}
+	if logs[len(logs)-1].PID != 1005 {
+		t.Fatalf("expected oldest returned log to be PID 1005, got %d", logs[len(logs)-1].PID)
+	}
+}
+
+func TestRecentOperationLogsForProcessFiltersByPIDOrProcessName(t *testing.T) {
+	ctx := context.Background()
+	store := newTestStore(t)
+
+	inputs := []OperationLogInput{
+		{
+			Action:      "kill_process_by_pid",
+			PID:         100,
+			ProcessName: "node.exe",
+			Result:      "success",
+			Message:     "Process node.exe ended.",
+		},
+		{
+			Action:      "kill_process_by_port",
+			PID:         0,
+			ProcessName: "NODE.EXE",
+			Port:        3000,
+			Result:      "failure",
+			Message:     "Permission denied.",
+		},
+		{
+			Action:      "kill_process_by_pid",
+			PID:         200,
+			ProcessName: "postgres.exe",
+			Result:      "success",
+			Message:     "Process postgres.exe ended.",
+		},
+	}
+	for _, input := range inputs {
+		if err := store.AddOperationLog(ctx, input); err != nil {
+			t.Fatalf("add operation log: %v", err)
+		}
+	}
+
+	logs, err := store.GetRecentOperationLogsForProcess(ctx, 100, "node.exe", 5)
+	if err != nil {
+		t.Fatalf("get process operation logs: %v", err)
+	}
+	if len(logs) != 2 {
+		t.Fatalf("expected 2 related logs, got %d: %+v", len(logs), logs)
+	}
+	if logs[0].ProcessName != "NODE.EXE" || logs[1].PID != 100 {
+		t.Fatalf("expected newest related PID/name logs first, got %+v", logs)
+	}
+}
+
+func TestRecentOperationLogsForResourceFiltersByPIDProcessNameOrPortsAndLimits(t *testing.T) {
+	ctx := context.Background()
+	store := newTestStore(t)
+
+	inputs := []OperationLogInput{
+		{
+			Action:      "kill_process_by_pid",
+			PID:         100,
+			ProcessName: "node.exe",
+			Result:      "success",
+			Message:     "Process node.exe ended.",
+		},
+		{
+			Action:      "kill_process_by_port",
+			PID:         900,
+			ProcessName: "redis-server.exe",
+			Port:        6379,
+			Result:      "success",
+			Message:     "Unrelated port ended.",
+		},
+		{
+			Action:      "kill_process_by_pid",
+			PID:         700,
+			ProcessName: "NODE.EXE",
+			Result:      "failure",
+			Message:     "Matched by process name.",
+		},
+		{
+			Action:      "kill_process_by_port",
+			PID:         0,
+			ProcessName: "",
+			Port:        3000,
+			Result:      "success",
+			Message:     "Matched by port.",
+		},
+	}
+	for _, input := range inputs {
+		if err := store.AddOperationLog(ctx, input); err != nil {
+			t.Fatalf("add operation log: %v", err)
+		}
+	}
+
+	logs, err := store.GetRecentOperationLogsForResource(ctx, 100, "node.exe", []int{3000}, 2)
+	if err != nil {
+		t.Fatalf("get resource operation logs: %v", err)
+	}
+	if len(logs) != 2 {
+		t.Fatalf("expected 2 limited resource logs, got %d: %+v", len(logs), logs)
+	}
+	if logs[0].Port != 3000 || logs[1].ProcessName != "NODE.EXE" {
+		t.Fatalf("expected newest port/name logs first, got %+v", logs)
+	}
+}
+
 func newTestStore(t *testing.T) *Store {
 	t.Helper()
 

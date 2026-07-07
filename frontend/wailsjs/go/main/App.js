@@ -22,12 +22,20 @@ export function GetPortList() {
   return window['go']['main']['App']['GetPortList']();
 }
 
+export function GetProcessDetail(arg1) {
+  return window['go']['main']['App']['GetProcessDetail'](arg1);
+}
+
 export function GetProcessList() {
   return window['go']['main']['App']['GetProcessList']();
 }
 
 export function GetProtectionSettings() {
   return window['go']['main']['App']['GetProtectionSettings']();
+}
+
+export function GetRecentOperationLogsForResource(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetRecentOperationLogsForResource'](arg1, arg2, arg3);
 }
 
 export function GetSystemResourceInfo() {

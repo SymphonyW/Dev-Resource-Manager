@@ -1,5 +1,6 @@
-import {FormEvent, useCallback, useEffect, useState} from 'react';
+import {FormEvent, useCallback, useState} from 'react';
 import StatusMessage from '../components/StatusMessage';
+import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
 import {
     addCustomProtectedProcessName,
     deleteCustomProtectedProcessName,
@@ -50,14 +51,7 @@ function SettingsPage({language, page, t, onLanguageChange}: SettingsPageProps) 
         }
     }, [t]);
 
-    useEffect(() => {
-        void loadSettings(true);
-        const intervalId = window.setInterval(() => {
-            void loadSettings(false);
-        }, settingsRefreshIntervalMs);
-
-        return () => window.clearInterval(intervalId);
-    }, [loadSettings]);
+    useSequentialAutoRefresh(loadSettings, settingsRefreshIntervalMs);
 
     const handleAddCustomProcess = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -101,15 +95,7 @@ function SettingsPage({language, page, t, onLanguageChange}: SettingsPageProps) 
     };
 
     return (
-        <section className="page-panel settings-page" aria-labelledby={`${page.id}-title`}>
-            <div className="page-header compact-page-header">
-                <div>
-                    <p className="eyebrow">{page.eyebrow}</p>
-                    <h1 id={`${page.id}-title`}>{page.title}</h1>
-                    <p className="page-description">{page.description}</p>
-                </div>
-            </div>
-
+        <section className="page-panel settings-page" aria-label={page.title}>
             <div className="settings-preferences-row">
                 <section className="settings-section settings-preferences" aria-labelledby="settings-preferences-title">
                     <div className="settings-section-header">
