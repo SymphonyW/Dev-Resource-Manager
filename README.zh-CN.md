@@ -18,6 +18,8 @@
 
 # Dev Resource Manager
 
+[Download Windows installer](https://github.com/SymphonyW/Dev-Resource-Manager/releases/latest/download/dev-resource-manager-amd64-installer.exe)
+
 Dev Resource Manager 是一个面向开发者的 Windows 桌面资源管理工具，用于快速查看本机进程、端口占用和系统资源使用情况。
 
 项目基于 Wails、Go、React、TypeScript 和 Vite 构建。它不是 Windows 任务管理器的完整替代品，而是聚焦于开发场景中的本地诊断：定位端口被哪个进程占用、查看资源消耗、并在确认后安全结束开发相关进程。

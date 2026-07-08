@@ -18,6 +18,8 @@
 
 # Dev Resource Manager
 
+[Download Windows installer](https://github.com/SymphonyW/Dev-Resource-Manager/releases/latest/download/dev-resource-manager-amd64-installer.exe)
+
 Dev Resource Manager is a Windows desktop application for developers who need a clear view of local processes, ports, and system resource usage.
 
 It is built with Wails, Go, React, TypeScript, and Vite. The project focuses on practical local diagnostics: finding which process owns a port, reviewing resource usage, and safely stopping development-related processes when needed.
