@@ -96,6 +96,93 @@ func TestProtectionStoreRejectsEmptyAndDuplicateCustomNames(t *testing.T) {
 	}
 }
 
+func TestCleanupRulesSeedDefaultsAndPersistUserChanges(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "settings.sqlite3")
+
+	store, err := NewStore(dbPath)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	rules, err := store.GetCleanupRules(ctx)
+	if err != nil {
+		t.Fatalf("get cleanup rules: %v", err)
+	}
+	nodeRule := findCleanupRule(t, rules, "builtin-node-vite")
+	if !nodeRule.Enabled {
+		t.Fatalf("expected Node/Vite default rule to be enabled")
+	}
+	if !nodeRule.IsBuiltin {
+		t.Fatalf("expected Node/Vite default rule to be marked built-in")
+	}
+	if !containsString(nodeRule.MatchProcessNames, "node.exe") || !containsInt(nodeRule.MatchPorts, 5173) {
+		t.Fatalf("expected Node/Vite rule to include process names and ports, got %+v", nodeRule)
+	}
+
+	rules, err = store.SetCleanupRuleEnabled(ctx, "builtin-node-vite", false)
+	if err != nil {
+		t.Fatalf("disable cleanup rule: %v", err)
+	}
+	if findCleanupRule(t, rules, "builtin-node-vite").Enabled {
+		t.Fatalf("expected Node/Vite rule to be disabled")
+	}
+
+	rules, err = store.AddCleanupRule(ctx, CleanupRuleInput{
+		Name:                 "Local API",
+		Enabled:              true,
+		MatchProcessNames:    []string{"API.EXE"},
+		MatchCommandKeywords: []string{"--dev-api"},
+		MatchPorts:           []int{9100},
+		MatchPortRanges: []CleanupPortRange{
+			{Start: 7000, End: 7002},
+		},
+	})
+	if err != nil {
+		t.Fatalf("add cleanup rule: %v", err)
+	}
+	customRule := findCleanupRuleByName(t, rules, "Local API")
+	if customRule.IsBuiltin {
+		t.Fatalf("expected custom rule not to be built-in")
+	}
+	if !containsString(customRule.MatchProcessNames, "api.exe") {
+		t.Fatalf("expected process names to be normalized, got %+v", customRule.MatchProcessNames)
+	}
+
+	if _, err := store.DeleteCleanupRule(ctx, "builtin-node-vite"); err == nil {
+		t.Fatalf("expected deleting a built-in cleanup rule to fail")
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("close store: %v", err)
+	}
+
+	reopened, err := NewStore(dbPath)
+	if err != nil {
+		t.Fatalf("reopen store: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := reopened.Close(); err != nil {
+			t.Fatalf("close reopened store: %v", err)
+		}
+	})
+
+	rules, err = reopened.GetCleanupRules(ctx)
+	if err != nil {
+		t.Fatalf("get reopened cleanup rules: %v", err)
+	}
+	if findCleanupRule(t, rules, "builtin-node-vite").Enabled {
+		t.Fatalf("expected disabled built-in rule to persist after reopening")
+	}
+	customRule = findCleanupRuleByName(t, rules, "Local API")
+	rules, err = reopened.DeleteCleanupRule(ctx, customRule.ID)
+	if err != nil {
+		t.Fatalf("delete custom cleanup rule: %v", err)
+	}
+	if cleanupRuleExistsByName(rules, "Local API") {
+		t.Fatalf("expected custom cleanup rule to be deleted, got %+v", rules)
+	}
+}
+
 func TestOperationLogsAreStoredNewestFirst(t *testing.T) {
 	ctx := context.Background()
 	store := newTestStore(t)
@@ -288,6 +375,52 @@ func newTestStore(t *testing.T) *Store {
 func containsString(values []string, expected string) bool {
 	for _, value := range values {
 		if value == expected {
+			return true
+		}
+	}
+
+	return false
+}
+
+func containsInt(values []int, expected int) bool {
+	for _, value := range values {
+		if value == expected {
+			return true
+		}
+	}
+
+	return false
+}
+
+func findCleanupRule(t *testing.T, rules []CleanupRule, id string) CleanupRule {
+	t.Helper()
+
+	for _, rule := range rules {
+		if rule.ID == id {
+			return rule
+		}
+	}
+
+	t.Fatalf("cleanup rule %q not found in %+v", id, rules)
+	return CleanupRule{}
+}
+
+func findCleanupRuleByName(t *testing.T, rules []CleanupRule, name string) CleanupRule {
+	t.Helper()
+
+	for _, rule := range rules {
+		if rule.Name == name {
+			return rule
+		}
+	}
+
+	t.Fatalf("cleanup rule named %q not found in %+v", name, rules)
+	return CleanupRule{}
+}
+
+func cleanupRuleExistsByName(rules []CleanupRule, name string) bool {
+	for _, rule := range rules {
+		if rule.Name == name {
 			return true
 		}
 	}

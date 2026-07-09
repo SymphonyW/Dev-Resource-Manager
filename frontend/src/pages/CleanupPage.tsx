@@ -4,10 +4,11 @@ import ProcessNameCell from '../components/ProcessNameCell';
 import ScrollableDataTable from '../components/ScrollableDataTable';
 import StatusMessage from '../components/StatusMessage';
 import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
-import {buildCleanupCandidates} from '../services/cleanup';
+import {buildCleanupCandidates, formatCleanupRuleNames, formatCleanupRuleReasons} from '../services/cleanup';
 import {loadRecentOperationLogsForResource} from '../services/logs';
 import {isCommonDevelopmentPort, loadPortList} from '../services/ports';
 import {killProcessByPID, loadProcessList} from '../services/processes';
+import {loadCleanupRules} from '../services/settings';
 import {formatMemorySize, formatPercent, isHighMemoryUsage} from '../services/systemResources';
 import type {Translator} from '../services/i18n';
 import type {CleanupCandidate} from '../types/cleanup';
@@ -15,6 +16,7 @@ import type {OperationLog} from '../types/logs';
 import type {PageDefinition} from '../types/navigation';
 import type {PortInfo} from '../types/ports';
 import type {ProcessInfo} from '../types/processes';
+import type {CleanupRule} from '../types/settings';
 
 const cleanupRefreshIntervalMs = 5000;
 
@@ -26,6 +28,7 @@ interface CleanupPageProps {
 function CleanupPage({page, t}: CleanupPageProps) {
     const [processes, setProcesses] = useState<ProcessInfo[]>([]);
     const [ports, setPorts] = useState<PortInfo[]>([]);
+    const [cleanupRules, setCleanupRules] = useState<CleanupRule[]>([]);
     const [selectedPIDs, setSelectedPIDs] = useState<Set<number>>(new Set());
     const [isLoading, setIsLoading] = useState(false);
     const [isKilling, setIsKilling] = useState(false);
@@ -44,15 +47,18 @@ function CleanupPage({page, t}: CleanupPageProps) {
         setErrorMessage('');
 
         try {
-            const [nextProcesses, nextPorts] = await Promise.all([
+            const [nextProcesses, nextPorts, nextCleanupRules] = await Promise.all([
                 loadProcessList(),
                 loadPortList(),
+                loadCleanupRules(),
             ]);
             setProcesses(nextProcesses);
             setPorts(nextPorts);
+            setCleanupRules(nextCleanupRules);
         } catch {
             setProcesses([]);
             setPorts([]);
+            setCleanupRules([]);
             setErrorMessage(t('cleanup.error'));
         } finally {
             if (showLoading) {
@@ -64,8 +70,8 @@ function CleanupPage({page, t}: CleanupPageProps) {
     useSequentialAutoRefresh(loadCleanupData, cleanupRefreshIntervalMs);
 
     const candidates = useMemo(() => {
-        return buildCleanupCandidates(processes, ports);
-    }, [ports, processes]);
+        return buildCleanupCandidates(processes, ports, cleanupRules);
+    }, [cleanupRules, ports, processes]);
 
     useEffect(() => {
         setSelectedPIDs((currentSelectedPIDs) => {
@@ -328,7 +334,8 @@ function CleanupPage({page, t}: CleanupPageProps) {
                                     <th>{t('field.cpu')}</th>
                                     <th>{t('field.memory')}</th>
                                     <th>{t('field.ports')}</th>
-                                    <th>{t('field.protected')}</th>
+                                    <th>{t('field.rule')}</th>
+                                    <th>{t('field.reason')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -377,10 +384,11 @@ function CleanupPage({page, t}: CleanupPageProps) {
                                                 {isHighMemoryUsage(candidate.memoryBytes) && <span className="memory-badge">{t('badge.high')}</span>}
                                             </td>
                                             <td className="mono">{renderPorts(candidate.ports, t)}</td>
-                                            <td>
-                                                <span className={candidate.isProtected ? 'protected-badge' : 'standard-badge'}>
-                                                    {candidate.isProtected ? t('badge.protected') : t('badge.standard')}
-                                                </span>
+                                            <td title={formatCleanupRuleNames(candidate)}>
+                                                <span className="rule-cell">{formatCleanupRuleNames(candidate)}</span>
+                                            </td>
+                                            <td title={formatCleanupRuleReasons(candidate)}>
+                                                <span className="reason-cell">{formatCleanupRuleReasons(candidate)}</span>
                                             </td>
                                         </tr>
                                     );
@@ -429,10 +437,6 @@ function CleanupPage({page, t}: CleanupPageProps) {
                                     <dd>{selectedCandidate.name || t('common.unknown')}</dd>
                                 </div>
                                 <div>
-                                    <dt>{t('field.match')}</dt>
-                                    <dd>{selectedCandidate.match || t('common.unavailable')}</dd>
-                                </div>
-                                <div>
                                     <dt>{t('field.path')}</dt>
                                     <dd>{selectedCandidate.path || t('common.unavailable')}</dd>
                                 </div>
@@ -470,6 +474,8 @@ function CleanupPage({page, t}: CleanupPageProps) {
                                     </ul>
                                 )}
                             </div>
+
+                            <CleanupRuleMatches candidate={selectedCandidate} t={t}/>
 
                             <CleanupRelatedLogs
                                 logs={relatedLogs}
@@ -627,6 +633,34 @@ function renderPorts(ports: number[], t: Translator) {
             <span className={isCommonDevelopmentPort(port) ? 'inline-dev-port' : undefined}>{port}</span>
         </span>
     ));
+}
+
+interface CleanupRuleMatchesProps {
+    candidate: CleanupCandidate;
+    t: Translator;
+}
+
+function CleanupRuleMatches({candidate, t}: CleanupRuleMatchesProps) {
+    return (
+        <div className="detail-section">
+            <div className="detail-section-header">
+                <h3>{t('field.rule')}</h3>
+                <span className="settings-count">{candidate.matchedRules.length}</span>
+            </div>
+            <ul className="cleanup-match-list">
+                {candidate.matchedRules.map((match) => (
+                    <li key={match.ruleId}>
+                        <span className="protocol-badge">{match.ruleName}</span>
+                        <div className="cleanup-match-reasons">
+                            {match.reasons.map((reason) => (
+                                <span key={reason}>{reason}</span>
+                            ))}
+                        </div>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
 }
 
 interface RelatedLogsProps {

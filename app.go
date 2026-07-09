@@ -340,6 +340,50 @@ func (a *App) DeleteCustomProtectedProcessName(name string) (config.ProtectionSe
 	return store.DeleteCustomProtectedProcessName(a.appContext(), name)
 }
 
+// GetCleanupRules returns built-in and user-managed cleanup matching rules.
+func (a *App) GetCleanupRules() ([]config.CleanupRule, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return nil, err
+	}
+	defer store.Close()
+
+	return store.GetCleanupRules(a.appContext())
+}
+
+// AddCleanupRule adds a user-managed cleanup matching rule.
+func (a *App) AddCleanupRule(input config.CleanupRuleInput) ([]config.CleanupRule, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return nil, err
+	}
+	defer store.Close()
+
+	return store.AddCleanupRule(a.appContext(), input)
+}
+
+// SetCleanupRuleEnabled enables or disables a cleanup matching rule.
+func (a *App) SetCleanupRuleEnabled(id string, enabled bool) ([]config.CleanupRule, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return nil, err
+	}
+	defer store.Close()
+
+	return store.SetCleanupRuleEnabled(a.appContext(), id, enabled)
+}
+
+// DeleteCleanupRule removes a user-managed cleanup matching rule.
+func (a *App) DeleteCleanupRule(id string) ([]config.CleanupRule, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return nil, err
+	}
+	defer store.Close()
+
+	return store.DeleteCleanupRule(a.appContext(), id)
+}
+
 // GetOperationLogs returns persisted process operation logs ordered newest first.
 func (a *App) GetOperationLogs() ([]config.OperationLog, error) {
 	store, err := config.NewDefaultStore()
