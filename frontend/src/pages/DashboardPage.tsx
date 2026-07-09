@@ -1,4 +1,5 @@
 import {useCallback, useState} from 'react';
+import type {MouseEvent} from 'react';
 import StatusMessage from '../components/StatusMessage';
 import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
 import {formatMemorySize, formatPercent, loadSystemResourceInfo} from '../services/systemResources';
@@ -6,7 +7,7 @@ import type {Translator} from '../services/i18n';
 import type {PageDefinition} from '../types/navigation';
 import type {SystemResourceInfo} from '../types/systemResources';
 
-const resourceRefreshIntervalMs = 5000;
+const resourceRefreshIntervalMs = 3000;
 const maxHistoryPoints = 30;
 
 interface DashboardPageProps {
@@ -154,8 +155,27 @@ interface ResourceGraphProps {
 }
 
 function ResourceGraph({ariaLabel, history, historyKey, subtitle, title, value, t}: ResourceGraphProps) {
+    const [activePointIndex, setActivePointIndex] = useState<number | null>(null);
+    const graphPoints = getGraphPoints(history, historyKey);
     const points = buildSparklinePoints(history, historyKey);
     const areaPath = buildAreaPath(history, historyKey);
+    const activeGraphPoint = activePointIndex === null ? null : graphPoints[activePointIndex] ?? null;
+    const activeHistoryPoint = activePointIndex === null
+        ? null
+        : history[Math.min(activePointIndex, Math.max(history.length - 1, 0))] ?? null;
+    const activeValue = activeHistoryPoint ? formatPercent(clampPercent(activeHistoryPoint[historyKey])) : '';
+
+    const handleChartMouseMove = (event: MouseEvent<SVGSVGElement>) => {
+        if (graphPoints.length === 0) {
+            return;
+        }
+
+        const bounds = event.currentTarget.getBoundingClientRect();
+        const chartWidth = bounds.width || 100;
+        const relativeX = Math.min(chartWidth, Math.max(0, event.clientX - bounds.left));
+        const nextPointIndex = Math.round((relativeX / chartWidth) * (graphPoints.length - 1));
+        setActivePointIndex(nextPointIndex);
+    };
 
     return (
         <section className="resource-chart-panel task-manager-chart">
@@ -172,13 +192,35 @@ function ResourceGraph({ariaLabel, history, historyKey, subtitle, title, value, 
                 <svg
                     aria-label={ariaLabel}
                     className="cpu-sparkline"
+                    onBlur={() => setActivePointIndex(null)}
+                    onFocus={() => setActivePointIndex(graphPoints.length > 0 ? graphPoints.length - 1 : null)}
+                    onMouseLeave={() => setActivePointIndex(null)}
+                    onMouseMove={handleChartMouseMove}
                     role="img"
+                    tabIndex={0}
                     viewBox="0 0 100 64"
                     preserveAspectRatio="none"
                 >
                     <path d={areaPath}/>
                     <polyline points={points}/>
+                    {activeGraphPoint && (
+                        <g className="chart-active-marker">
+                            <line x1={activeGraphPoint.x} y1="4" x2={activeGraphPoint.x} y2="62"/>
+                            <circle cx={activeGraphPoint.x} cy={activeGraphPoint.y} r="2.2"/>
+                        </g>
+                    )}
                 </svg>
+                {activeGraphPoint && activeValue && (
+                    <output
+                        className="chart-hover-tooltip"
+                        style={{
+                            left: `${activeGraphPoint.x}%`,
+                            top: `${(activeGraphPoint.y / 64) * 100}%`,
+                        }}
+                    >
+                        {title} {activeValue}
+                    </output>
+                )}
                 <span className="chart-time-label">{t('dashboard.chart.sixtySeconds')}</span>
             </div>
         </section>

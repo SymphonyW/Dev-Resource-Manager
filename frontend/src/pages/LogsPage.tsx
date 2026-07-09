@@ -1,4 +1,5 @@
 import {useCallback, useState} from 'react';
+import ScrollableDataTable from '../components/ScrollableDataTable';
 import StatusMessage from '../components/StatusMessage';
 import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
 import {loadOperationLogs} from '../services/logs';
@@ -51,7 +52,10 @@ function LogsPage({page, t}: LogsPageProps) {
             )}
 
             {logs.length > 0 && (
-                <div className="process-table-wrap compact-table-wrap">
+                <ScrollableDataTable
+                    className="compact-table-wrap"
+                    scrollbarLabel={`${t('table.logsList')} horizontal scroll`}
+                >
                     <table className="process-table logs-table compact-data-table" aria-label={t('table.logsList')}>
                         <thead>
                             <tr>
@@ -84,7 +88,7 @@ function LogsPage({page, t}: LogsPageProps) {
                             ))}
                         </tbody>
                     </table>
-                </div>
+                </ScrollableDataTable>
             )}
         </section>
     );

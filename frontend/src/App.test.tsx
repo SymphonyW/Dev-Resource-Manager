@@ -341,11 +341,18 @@ describe('App layout navigation', () => {
         expect(screen.getByText('3.0 GB / 8.0 GB')).toBeInTheDocument();
         expect(screen.getByText('184')).toBeInTheDocument();
         expect(screen.getByText('37')).toBeInTheDocument();
+        expect(screen.getAllByText('Updates every 3 seconds').length).toBeGreaterThan(0);
 
         expect(screen.queryByRole('button', {name: 'Refresh'})).not.toBeInTheDocument();
 
         await act(async () => {
-            vi.advanceTimersByTime(5000);
+            vi.advanceTimersByTime(2999);
+        });
+        await act(async () => {});
+        expect(getSystemResourceInfoMock).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            vi.advanceTimersByTime(1);
         });
         await act(async () => {});
 
@@ -396,7 +403,7 @@ describe('App layout navigation', () => {
         expect(screen.getByLabelText('VRAM usage chart')).toBeInTheDocument();
 
         await act(async () => {
-            vi.advanceTimersByTime(5000);
+            vi.advanceTimersByTime(3000);
         });
         await act(async () => {});
 
@@ -404,6 +411,15 @@ describe('App layout navigation', () => {
         expect(screen.getAllByText('25.0%').length).toBeGreaterThan(0);
         expect(screen.getAllByText('50.0%').length).toBeGreaterThanOrEqual(2);
         expect(screen.getByText('28.4%')).toBeInTheDocument();
+    });
+
+    it('shows interactive Dashboard chart values when hovering a chart', async () => {
+        render(<App/>);
+
+        const chart = await screen.findByLabelText('CPU usage chart');
+        fireEvent.mouseMove(chart, {clientX: 20});
+
+        expect(screen.getByText('CPU 42.5%')).toBeInTheDocument();
     });
 
     it('switches application language from Settings', async () => {
@@ -849,6 +865,22 @@ describe('App layout navigation', () => {
         ]);
     });
 
+    it('renders bottom horizontal scrollbars for process data tables', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+        expect(screen.getByLabelText('Process list horizontal scroll')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
+        expect(await screen.findByText('3000')).toBeInTheDocument();
+        expect(screen.getByLabelText('Port list horizontal scroll')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', {name: 'Cleanup'}));
+        expect(await screen.findByText('postgres.exe')).toBeInTheDocument();
+        expect(screen.getByLabelText('Cleanup candidate list horizontal scroll')).toBeInTheDocument();
+    });
+
     it('keeps data table rows at a fixed height with single-line cells', () => {
         expect(appStyles).toContain('--resource-table-header-height: 34px;');
         expect(appStyles).toContain('--resource-table-row-height: 38px;');
@@ -857,6 +889,8 @@ describe('App layout navigation', () => {
         expect(appStyles).toMatch(/\.process-table td\s*\{[^}]*height: var\(--resource-table-row-height\);/s);
         expect(appStyles).toMatch(/\.command-cell\s*\{[^}]*white-space: nowrap;/s);
         expect(appStyles).toMatch(/\.process-name-cell\s*\{[^}]*display: flex;/s);
+        expect(appStyles).toMatch(/\.process-table-scrollbar\s*\{[^}]*position: sticky;[^}]*bottom: 0;/s);
+        expect(appStyles).toMatch(/\.process-table-wrap\s*\{[^}]*overflow-x: hidden;/s);
     });
 
     it('confirms and ends selected Cleanup candidates through the logged PID operation', async () => {
