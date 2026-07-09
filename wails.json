@@ -9,5 +9,13 @@
   "author": {
     "name": "SymphonyW",
     "email": "xinzhanwu1201@gmail.com"
-  }
+  },
+  "info": {
+    "companyName": "SymphonyW",
+    "productName": "Dev Resource Manager",
+    "productVersion": "1.0.1",
+    "copyright": "Copyright (c) 2026 SymphonyW",
+    "comments": "A local desktop resource manager for developers."
+  },
+  "nsisType": "multiple"
 }
