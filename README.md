@@ -117,7 +117,7 @@ Install -> launch -> check main pages -> uninstall -> confirm shortcuts and inst
 
 ## Release
 
-The repository includes a manual GitHub Actions workflow:
+The repository includes a GitHub Actions workflow that runs on pushes to `main` and can also be started manually:
 
 ```text
 Windows Release Build

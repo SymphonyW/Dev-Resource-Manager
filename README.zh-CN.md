@@ -117,7 +117,7 @@ npm --prefix frontend run build
 
 ## 发布
 
-仓库内置手动触发的 GitHub Actions workflow：
+该仓库包含一个 GitHub Actions 工作流程，会在推送到 `main` 时运行，也可以手动启动：
 
 ```text
 Windows Release Build
