@@ -1,7 +1,9 @@
 package main
 
 import (
+	"dev-resource-manager/internal/resource"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -22,6 +24,78 @@ func TestGetSystemResourceInfoReturnsResourceSnapshot(t *testing.T) {
 	}
 	if info.PortCount < 0 {
 		t.Fatalf("PortCount should not be negative: %d", info.PortCount)
+	}
+}
+
+func TestCollectSystemResourceInfoRunsCollectorsConcurrently(t *testing.T) {
+	var started atomic.Int32
+	allStarted := make(chan struct{})
+	release := make(chan struct{})
+	released := false
+	defer func() {
+		if !released {
+			close(release)
+		}
+	}()
+
+	markStarted := func() {
+		if started.Add(1) == 5 {
+			close(allStarted)
+		}
+		<-release
+	}
+
+	result := make(chan SystemResourceInfo, 1)
+	go func() {
+		result <- collectSystemResourceInfo(systemResourceCollectors{
+			CPUPercent: func() float64 {
+				markStarted()
+				return 12.3
+			},
+			Memory: func() memoryResourceInfo {
+				markStarted()
+				return memoryResourceInfo{
+					TotalBytes: 100,
+					UsedBytes:  40,
+					FreeBytes:  60,
+				}
+			},
+			GPU: func() resource.GPUInfo {
+				markStarted()
+				return resource.GPUInfo{
+					GPUPercent:     21.5,
+					TotalVRAMBytes: 80,
+					UsedVRAMBytes:  20,
+					FreeVRAMBytes:  60,
+				}
+			},
+			ProcessCount: func() int {
+				markStarted()
+				return 7
+			},
+			PortCount: func() int {
+				markStarted()
+				return 3
+			},
+		})
+	}()
+
+	select {
+	case <-allStarted:
+	case <-time.After(150 * time.Millisecond):
+		t.Fatalf("expected resource collectors to start concurrently, got %d started", started.Load())
+	}
+
+	close(release)
+	released = true
+
+	select {
+	case info := <-result:
+		if info.CPUPercent != 12.3 || info.TotalMemoryBytes != 100 || info.GPUPercent != 21.5 || info.ProcessCount != 7 || info.PortCount != 3 {
+			t.Fatalf("unexpected resource info: %+v", info)
+		}
+	case <-time.After(150 * time.Millisecond):
+		t.Fatalf("expected resource info after releasing collectors")
 	}
 }
 
