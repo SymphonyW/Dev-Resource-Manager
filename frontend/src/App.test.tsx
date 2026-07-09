@@ -893,6 +893,8 @@ describe('App layout navigation', () => {
         expect(appStyles).toMatch(/\.process-table-wrap\s*\{[^}]*overflow-x: hidden;/s);
         expect(appStyles).toMatch(/\.process-table-wrap\s*\{[^}]*overflow-y: auto;/s);
         expect(appStyles).toMatch(/\.process-table-scrollbar\s*\{[^}]*position: relative;/s);
+        expect(appStyles).toMatch(/\.process-table-scrollbar\s*\{[^}]*scrollbar-color: auto;/s);
+        expect(appStyles).not.toMatch(/\.process-table-scrollbar::-webkit-scrollbar-thumb\s*\{[^}]*var\(--accent/s);
     });
 
     it('confirms and ends selected Cleanup candidates through the logged PID operation', async () => {
