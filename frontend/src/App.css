@@ -566,13 +566,18 @@ h1 {
 
 .process-table-shell {
     position: relative;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 154px);
     min-width: 0;
 }
 
 .process-table-wrap {
+    flex: 1 1 auto;
     max-width: 100%;
+    min-height: 0;
     overflow-x: hidden;
-    overflow-y: visible;
+    overflow-y: auto;
     border: 1px solid var(--border);
     border-radius: 8px;
     background: var(--surface);
@@ -580,16 +585,49 @@ h1 {
 }
 
 .process-table-scrollbar {
-    position: sticky;
-    bottom: 0;
+    position: relative;
+    flex: 0 0 14px;
     z-index: 6;
-    height: 16px;
-    margin-top: 6px;
+    height: 14px;
+    margin: 7px 8px 0;
     overflow-x: auto;
     overflow-y: hidden;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: rgba(248, 251, 255, 0.96);
+    border: 0;
+    border-radius: 999px;
+    background: rgba(231, 240, 255, 0.56);
+    box-shadow: inset 0 0 0 1px rgba(184, 201, 223, 0.54);
+    scrollbar-color: rgba(37, 99, 235, 0.56) rgba(231, 240, 255, 0.56);
+    scrollbar-width: thin;
+}
+
+.process-table-scrollbar::-webkit-scrollbar {
+    height: 10px;
+}
+
+.process-table-scrollbar::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+.process-table-scrollbar::-webkit-scrollbar-track {
+    border-radius: 999px;
+    background: rgba(215, 227, 242, 0.58);
+    margin: 0 6px;
+}
+
+.process-table-scrollbar::-webkit-scrollbar-thumb {
+    border: 2px solid rgba(248, 251, 255, 0.96);
+    border-radius: 999px;
+    background: linear-gradient(90deg, #7fb3ff 0%, var(--accent) 100%);
+}
+
+.process-table-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(90deg, #60a5fa 0%, var(--accent-hover) 100%);
+}
+
+.process-table-scrollbar::-webkit-scrollbar-thumb:active {
+    background: var(--accent-hover);
 }
 
 .process-table-scrollbar:focus-visible {
@@ -1487,6 +1525,14 @@ h1 {
     .process-detail-drawer {
         position: static;
         max-height: none;
+    }
+
+    .process-table-shell {
+        max-height: none;
+    }
+
+    .process-table-wrap {
+        overflow: auto;
     }
 
     .detail-field-list div,

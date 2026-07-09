@@ -889,8 +889,10 @@ describe('App layout navigation', () => {
         expect(appStyles).toMatch(/\.process-table td\s*\{[^}]*height: var\(--resource-table-row-height\);/s);
         expect(appStyles).toMatch(/\.command-cell\s*\{[^}]*white-space: nowrap;/s);
         expect(appStyles).toMatch(/\.process-name-cell\s*\{[^}]*display: flex;/s);
-        expect(appStyles).toMatch(/\.process-table-scrollbar\s*\{[^}]*position: sticky;[^}]*bottom: 0;/s);
+        expect(appStyles).toMatch(/\.process-table-shell\s*\{[^}]*max-height: calc\(100vh - 154px\);/s);
         expect(appStyles).toMatch(/\.process-table-wrap\s*\{[^}]*overflow-x: hidden;/s);
+        expect(appStyles).toMatch(/\.process-table-wrap\s*\{[^}]*overflow-y: auto;/s);
+        expect(appStyles).toMatch(/\.process-table-scrollbar\s*\{[^}]*position: relative;/s);
     });
 
     it('confirms and ends selected Cleanup candidates through the logged PID operation', async () => {
