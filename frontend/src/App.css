@@ -264,6 +264,12 @@ h1 {
         linear-gradient(180deg, rgba(37, 99, 235, 0.10), rgba(37, 99, 235, 0.02)),
         repeating-linear-gradient(0deg, transparent, transparent 20px, rgba(99, 123, 150, 0.16) 21px),
         repeating-linear-gradient(90deg, transparent, transparent 46px, rgba(99, 123, 150, 0.12) 47px);
+    cursor: crosshair;
+    outline: none;
+}
+
+.cpu-sparkline:focus-visible {
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
 }
 
 .cpu-sparkline path {
@@ -277,6 +283,37 @@ h1 {
     stroke-linejoin: round;
     stroke-width: 3;
     vector-effect: non-scaling-stroke;
+}
+
+.chart-active-marker line {
+    stroke: rgba(37, 99, 235, 0.36);
+    stroke-dasharray: 3 3;
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+}
+
+.chart-active-marker circle {
+    fill: #ffffff;
+    stroke: var(--accent);
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+}
+
+.chart-hover-tooltip {
+    position: absolute;
+    z-index: 3;
+    border: 1px solid var(--accent-border);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.14);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+    padding: 7px 8px;
+    pointer-events: none;
+    transform: translate(-50%, calc(-100% - 8px));
+    white-space: nowrap;
 }
 
 .task-manager-chart {
@@ -527,13 +564,48 @@ h1 {
     color: var(--accent);
 }
 
+.process-table-shell {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 154px);
+    min-width: 0;
+}
+
 .process-table-wrap {
+    flex: 1 1 auto;
     max-width: 100%;
-    overflow: auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
     border: 1px solid var(--border);
     border-radius: 8px;
     background: var(--surface);
     box-shadow: none;
+}
+
+.process-table-scrollbar {
+    position: relative;
+    flex: 0 0 14px;
+    z-index: 6;
+    height: 14px;
+    margin: 7px 8px 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border: 0;
+    background: transparent;
+    scrollbar-color: auto;
+    scrollbar-width: auto;
+}
+
+.process-table-scrollbar:focus-visible {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.13);
+    outline: none;
+}
+
+.process-table-scrollbar-spacer {
+    height: 1px;
 }
 
 .compact-table-wrap {
@@ -1072,6 +1144,10 @@ h1 {
     grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
 }
 
+.process-detail-layout.has-detail .process-table-shell {
+    min-width: 0;
+}
+
 .process-detail-layout.has-detail .process-table-wrap {
     min-width: 0;
 }
@@ -1417,6 +1493,14 @@ h1 {
     .process-detail-drawer {
         position: static;
         max-height: none;
+    }
+
+    .process-table-shell {
+        max-height: none;
+    }
+
+    .process-table-wrap {
+        overflow: auto;
     }
 
     .detail-field-list div,

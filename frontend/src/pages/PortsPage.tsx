@@ -1,6 +1,7 @@
 import {useCallback, useMemo, useState} from 'react';
 import type {KeyboardEvent} from 'react';
 import ProcessNameCell from '../components/ProcessNameCell';
+import ScrollableDataTable from '../components/ScrollableDataTable';
 import StatusMessage from '../components/StatusMessage';
 import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
 import {loadRecentOperationLogsForResource} from '../services/logs';
@@ -232,7 +233,10 @@ function PortsPage({page, t}: PortsPageProps) {
 
             {visiblePorts.length > 0 && (
                 <div className={selectedPort ? 'process-detail-layout has-detail' : 'process-detail-layout'}>
-                    <div className="process-table-wrap compact-table-wrap">
+                    <ScrollableDataTable
+                        className="compact-table-wrap"
+                        scrollbarLabel={`${t('table.portList')} horizontal scroll`}
+                    >
                         <table className="process-table port-table compact-data-table" aria-label={t('table.portList')}>
                             <thead>
                                 <tr>
@@ -299,7 +303,7 @@ function PortsPage({page, t}: PortsPageProps) {
                                 })}
                             </tbody>
                         </table>
-                    </div>
+                    </ScrollableDataTable>
 
                     {selectedPort && (
                     <aside

@@ -1,6 +1,9 @@
 package resource
 
-import "math"
+import (
+	"math"
+	"sync"
+)
 
 // GPUInfo is a best-effort snapshot of GPU engine and dedicated VRAM usage.
 type GPUInfo struct {
@@ -20,6 +23,43 @@ type gpuMemoryCounter struct {
 	DedicatedUsage uint64
 	SharedUsage    uint64
 	TotalCommitted uint64
+}
+
+type totalVRAMReadFunc func() (uint64, error)
+
+type cachedTotalVRAMReader struct {
+	mu      sync.Mutex
+	read    totalVRAMReadFunc
+	cached  uint64
+	hasRead bool
+}
+
+func newCachedTotalVRAMReader(read totalVRAMReadFunc) *cachedTotalVRAMReader {
+	return &cachedTotalVRAMReader{read: read}
+}
+
+func (reader *cachedTotalVRAMReader) Read() (uint64, error) {
+	if reader == nil || reader.read == nil {
+		return 0, nil
+	}
+
+	reader.mu.Lock()
+	defer reader.mu.Unlock()
+
+	if reader.hasRead {
+		return reader.cached, nil
+	}
+
+	totalVRAMBytes, err := reader.read()
+	if err != nil {
+		return 0, err
+	}
+	if totalVRAMBytes > 0 {
+		reader.cached = totalVRAMBytes
+		reader.hasRead = true
+	}
+
+	return totalVRAMBytes, nil
 }
 
 func buildGPUInfo(engineCounters []gpuEngineCounter, memoryCounters []gpuMemoryCounter, totalVRAMBytes uint64) GPUInfo {

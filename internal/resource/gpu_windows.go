@@ -11,6 +11,8 @@ import (
 
 const displayAdapterClassRegistryPath = `SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}`
 
+var defaultTotalVRAMReader = newCachedTotalVRAMReader(readTotalVRAMBytes)
+
 // GetGPUInfo returns a Windows GPU usage snapshot from WMI performance counters.
 func GetGPUInfo() GPUInfo {
 	engineCounters, err := queryGPUEngineCounters()
@@ -25,7 +27,7 @@ func GetGPUInfo() GPUInfo {
 		memoryCounters = nil
 	}
 
-	totalVRAMBytes, err := readTotalVRAMBytes()
+	totalVRAMBytes, err := defaultTotalVRAMReader.Read()
 	if err != nil {
 		// TODO: expose a precise driver-level VRAM total when neither registry nor WMI can provide it.
 		totalVRAMBytes = 0

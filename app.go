@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
-	"time"
+	"sync"
 
 	"dev-resource-manager/internal/config"
 	processdetail "dev-resource-manager/internal/detail"
@@ -56,57 +56,147 @@ func (a *App) AppName() string {
 
 // GetSystemResourceInfo returns a best-effort snapshot of local system usage.
 func (a *App) GetSystemResourceInfo() SystemResourceInfo {
-	info := SystemResourceInfo{}
-
-	if percentages, err := cpu.Percent(200*time.Millisecond, false); err == nil && len(percentages) > 0 {
-		info.CPUPercent = roundOneDecimal(percentages[0])
-	} else {
-		// TODO: surface CPU collection errors to the frontend diagnostics panel.
-		info.CPUPercent = 0
-	}
-
-	if memory, err := mem.VirtualMemory(); err == nil {
-		info.TotalMemoryBytes = memory.Total
-		info.UsedMemoryBytes = memory.Used
-		info.FreeMemoryBytes = memory.Available
-	} else {
-		// TODO: surface memory collection errors to the frontend diagnostics panel.
-		info.TotalMemoryBytes = 0
-		info.UsedMemoryBytes = 0
-		info.FreeMemoryBytes = 0
-	}
-
-	gpuInfo := resource.GetGPUInfo()
-	info.GPUPercent = gpuInfo.GPUPercent
-	info.TotalVRAMBytes = gpuInfo.TotalVRAMBytes
-	info.UsedVRAMBytes = gpuInfo.UsedVRAMBytes
-	info.FreeVRAMBytes = gpuInfo.FreeVRAMBytes
-
-	if pids, err := gopsprocess.Pids(); err == nil {
-		info.ProcessCount = len(pids)
-	} else {
-		// TODO: surface process collection permission errors to the frontend diagnostics panel.
-		info.ProcessCount = 0
-	}
-
-	if connections, err := net.Connections("inet"); err == nil {
-		ports := make(map[uint32]struct{})
-		for _, connection := range connections {
-			if connection.Laddr.Port > 0 {
-				ports[connection.Laddr.Port] = struct{}{}
-			}
-		}
-		info.PortCount = len(ports)
-	} else {
-		// TODO: surface port collection permission errors to the frontend diagnostics panel.
-		info.PortCount = 0
-	}
-
-	return info
+	return collectSystemResourceInfo(defaultSystemResourceCollectors())
 }
 
 func roundOneDecimal(value float64) float64 {
 	return math.Round(value*10) / 10
+}
+
+type memoryResourceInfo struct {
+	TotalBytes uint64
+	UsedBytes  uint64
+	FreeBytes  uint64
+}
+
+type systemResourceCollectors struct {
+	CPUPercent   func() float64
+	Memory       func() memoryResourceInfo
+	GPU          func() resource.GPUInfo
+	ProcessCount func() int
+	PortCount    func() int
+}
+
+func defaultSystemResourceCollectors() systemResourceCollectors {
+	return systemResourceCollectors{
+		CPUPercent:   collectCPUPercent,
+		Memory:       collectMemoryResourceInfo,
+		GPU:          resource.GetGPUInfo,
+		ProcessCount: collectProcessCount,
+		PortCount:    collectPortCount,
+	}
+}
+
+func collectSystemResourceInfo(collectors systemResourceCollectors) SystemResourceInfo {
+	var cpuPercent float64
+	var memoryInfo memoryResourceInfo
+	var gpuInfo resource.GPUInfo
+	var processCount int
+	var portCount int
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(5)
+
+	go func() {
+		defer waitGroup.Done()
+		if collectors.CPUPercent != nil {
+			cpuPercent = collectors.CPUPercent()
+		}
+	}()
+
+	go func() {
+		defer waitGroup.Done()
+		if collectors.Memory == nil {
+			return
+		}
+		memoryInfo = collectors.Memory()
+	}()
+
+	go func() {
+		defer waitGroup.Done()
+		if collectors.GPU == nil {
+			return
+		}
+		gpuInfo = collectors.GPU()
+	}()
+
+	go func() {
+		defer waitGroup.Done()
+		if collectors.ProcessCount != nil {
+			processCount = collectors.ProcessCount()
+		}
+	}()
+
+	go func() {
+		defer waitGroup.Done()
+		if collectors.PortCount != nil {
+			portCount = collectors.PortCount()
+		}
+	}()
+
+	waitGroup.Wait()
+	return SystemResourceInfo{
+		CPUPercent:       cpuPercent,
+		TotalMemoryBytes: memoryInfo.TotalBytes,
+		UsedMemoryBytes:  memoryInfo.UsedBytes,
+		FreeMemoryBytes:  memoryInfo.FreeBytes,
+		GPUPercent:       gpuInfo.GPUPercent,
+		TotalVRAMBytes:   gpuInfo.TotalVRAMBytes,
+		UsedVRAMBytes:    gpuInfo.UsedVRAMBytes,
+		FreeVRAMBytes:    gpuInfo.FreeVRAMBytes,
+		ProcessCount:     processCount,
+		PortCount:        portCount,
+	}
+}
+
+func collectCPUPercent() float64 {
+	percentages, err := cpu.Percent(0, false)
+	if err != nil || len(percentages) == 0 {
+		// TODO: surface CPU collection errors to the frontend diagnostics panel.
+		return 0
+	}
+
+	return roundOneDecimal(percentages[0])
+}
+
+func collectMemoryResourceInfo() memoryResourceInfo {
+	memory, err := mem.VirtualMemory()
+	if err != nil {
+		// TODO: surface memory collection errors to the frontend diagnostics panel.
+		return memoryResourceInfo{}
+	}
+
+	return memoryResourceInfo{
+		TotalBytes: memory.Total,
+		UsedBytes:  memory.Used,
+		FreeBytes:  memory.Available,
+	}
+}
+
+func collectProcessCount() int {
+	pids, err := gopsprocess.Pids()
+	if err != nil {
+		// TODO: surface process collection permission errors to the frontend diagnostics panel.
+		return 0
+	}
+
+	return len(pids)
+}
+
+func collectPortCount() int {
+	connections, err := net.Connections("inet")
+	if err != nil {
+		// TODO: surface port collection permission errors to the frontend diagnostics panel.
+		return 0
+	}
+
+	ports := make(map[uint32]struct{})
+	for _, connection := range connections {
+		if connection.Laddr.Port > 0 {
+			ports[connection.Laddr.Port] = struct{}{}
+		}
+	}
+
+	return len(ports)
 }
 
 // GetProcessList returns the current Windows process list for the frontend.

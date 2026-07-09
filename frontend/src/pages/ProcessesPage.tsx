@@ -1,6 +1,7 @@
 import {useCallback, useMemo, useState} from 'react';
 import type {KeyboardEvent} from 'react';
 import ProcessNameCell from '../components/ProcessNameCell';
+import ScrollableDataTable from '../components/ScrollableDataTable';
 import StatusMessage from '../components/StatusMessage';
 import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
 import {formatMemorySize, formatPercent, isHighMemoryUsage} from '../services/systemResources';
@@ -227,7 +228,10 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
 
             {visibleProcesses.length > 0 && (
                 <div className={selectedDetailPID !== null ? 'process-detail-layout has-detail' : 'process-detail-layout'}>
-                    <div className="process-table-wrap compact-table-wrap">
+                    <ScrollableDataTable
+                        className="compact-table-wrap"
+                        scrollbarLabel={`${t('table.processList')} horizontal scroll`}
+                    >
                         <table className="process-table process-list-table compact-data-table" aria-label={t('table.processList')}>
                             <thead>
                                 <tr>
@@ -285,7 +289,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                 })}
                             </tbody>
                         </table>
-                    </div>
+                    </ScrollableDataTable>
 
                     {selectedDetailPID !== null && (
                     <aside

@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import type {KeyboardEvent} from 'react';
 import ProcessNameCell from '../components/ProcessNameCell';
+import ScrollableDataTable from '../components/ScrollableDataTable';
 import StatusMessage from '../components/StatusMessage';
 import {useSequentialAutoRefresh} from '../hooks/useSequentialAutoRefresh';
 import {buildCleanupCandidates} from '../services/cleanup';
@@ -312,7 +313,10 @@ function CleanupPage({page, t}: CleanupPageProps) {
 
             {candidates.length > 0 && (
                 <div className={selectedCandidate ? 'process-detail-layout has-detail' : 'process-detail-layout'}>
-                    <div className="process-table-wrap compact-table-wrap">
+                    <ScrollableDataTable
+                        className="compact-table-wrap"
+                        scrollbarLabel={`${t('table.cleanupList')} horizontal scroll`}
+                    >
                         <table className="process-table cleanup-table compact-data-table" aria-label={t('table.cleanupList')}>
                             <thead>
                                 <tr>
@@ -383,7 +387,7 @@ function CleanupPage({page, t}: CleanupPageProps) {
                                 })}
                             </tbody>
                         </table>
-                    </div>
+                    </ScrollableDataTable>
 
                     {selectedCandidate && (
                     <aside
