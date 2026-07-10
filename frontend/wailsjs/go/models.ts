@@ -1,41 +1,45 @@
 export namespace config {
-
+	
 	export class CleanupPortRange {
 	    start: number;
 	    end: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CleanupPortRange(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.start = source["start"];
 	        this.end = source["end"];
 	    }
 	}
-	export class CleanupRuleInput {
+	export class CleanupRule {
+	    id: string;
 	    name: string;
 	    enabled: boolean;
+	    isBuiltin: boolean;
 	    matchProcessNames: string[];
 	    matchCommandKeywords: string[];
 	    matchPorts: number[];
 	    matchPortRanges: CleanupPortRange[];
-
+	
 	    static createFrom(source: any = {}) {
-	        return new CleanupRuleInput(source);
+	        return new CleanupRule(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
 	        this.name = source["name"];
 	        this.enabled = source["enabled"];
+	        this.isBuiltin = source["isBuiltin"];
 	        this.matchProcessNames = source["matchProcessNames"];
 	        this.matchCommandKeywords = source["matchCommandKeywords"];
 	        this.matchPorts = source["matchPorts"];
 	        this.matchPortRanges = this.convertValues(source["matchPortRanges"], CleanupPortRange);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -54,32 +58,28 @@ export namespace config {
 		    return a;
 		}
 	}
-	export class CleanupRule {
-	    id: string;
+	export class CleanupRuleInput {
 	    name: string;
 	    enabled: boolean;
-	    isBuiltin: boolean;
 	    matchProcessNames: string[];
 	    matchCommandKeywords: string[];
 	    matchPorts: number[];
 	    matchPortRanges: CleanupPortRange[];
-
+	
 	    static createFrom(source: any = {}) {
-	        return new CleanupRule(source);
+	        return new CleanupRuleInput(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
 	        this.name = source["name"];
 	        this.enabled = source["enabled"];
-	        this.isBuiltin = source["isBuiltin"];
 	        this.matchProcessNames = source["matchProcessNames"];
 	        this.matchCommandKeywords = source["matchCommandKeywords"];
 	        this.matchPorts = source["matchPorts"];
 	        this.matchPortRanges = this.convertValues(source["matchPortRanges"], CleanupPortRange);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -334,3 +334,4 @@ export namespace process {
 	}
 
 }
+
