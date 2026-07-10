@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	_ "modernc.org/sqlite"
 )
@@ -52,6 +53,8 @@ type Store struct {
 	db *sql.DB
 }
 
+var storeInitializeMu sync.Mutex
+
 // DefaultDatabasePath returns the SQLite database path for user configuration.
 func DefaultDatabasePath() (string, error) {
 	configDir, err := os.UserConfigDir()
@@ -89,6 +92,8 @@ func NewStore(dbPath string) (*Store, error) {
 	db.SetMaxOpenConns(1)
 
 	store := &Store{db: db}
+	storeInitializeMu.Lock()
+	defer storeInitializeMu.Unlock()
 	if err := store.initialize(context.Background()); err != nil {
 		_ = db.Close()
 		return nil, err

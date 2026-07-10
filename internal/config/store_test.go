@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -180,6 +181,43 @@ func TestCleanupRulesSeedDefaultsAndPersistUserChanges(t *testing.T) {
 	}
 	if cleanupRuleExistsByName(rules, "Local API") {
 		t.Fatalf("expected custom cleanup rule to be deleted, got %+v", rules)
+	}
+}
+
+func TestCleanupRuleInitializationAllowsConcurrentStoreOpen(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "settings.sqlite3")
+
+	const workerCount = 32
+	start := make(chan struct{})
+	errors := make(chan error, workerCount)
+	var waitGroup sync.WaitGroup
+
+	for i := 0; i < workerCount; i++ {
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			<-start
+
+			store, err := NewStore(dbPath)
+			if err != nil {
+				errors <- err
+				return
+			}
+			defer store.Close()
+
+			if _, err := store.GetCleanupRules(ctx); err != nil {
+				errors <- err
+			}
+		}()
+	}
+
+	close(start)
+	waitGroup.Wait()
+	close(errors)
+
+	for err := range errors {
+		t.Fatalf("concurrent store open failed: %v", err)
 	}
 }
 
