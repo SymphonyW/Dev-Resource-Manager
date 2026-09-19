@@ -23,9 +23,23 @@ interface Metric {
 }
 
 function graphPoints(history: Sample[], key: ResourceKey) {
-    const end = history[history.length - 1]?.time ?? 0;
+    if (history.length === 0) {
+        return [];
+    }
+    if (history.length === 1) {
+        const sample = history[0];
+        return [{
+            x: 100,
+            y: 100 - sample[key],
+            value: sample[key],
+        }];
+    }
+
+    const start = history[0].time;
+    const end = history[history.length - 1].time;
+    const span = end - start;
     return history.map(sample => ({
-        x: Math.max(0, 100 - (end - sample.time) / historyWindow * 100),
+        x: span > 0 ? percent((sample.time - start) / span * 100) : 0,
         y: 100 - sample[key],
         value: sample[key],
     }));
