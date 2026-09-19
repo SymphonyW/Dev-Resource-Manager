@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	_ "modernc.org/sqlite"
 )
@@ -32,10 +33,27 @@ const createOperationLogsCreatedAtIndexSQL = `
 CREATE INDEX IF NOT EXISTS idx_operation_logs_created_at
 ON operation_logs (created_at DESC, id DESC);`
 
+const createCleanupRulesTableSQL = `
+CREATE TABLE IF NOT EXISTS cleanup_rules (
+	id TEXT PRIMARY KEY NOT NULL,
+	name TEXT NOT NULL,
+	enabled INTEGER NOT NULL,
+	is_builtin INTEGER NOT NULL DEFAULT 0,
+	match_process_names TEXT NOT NULL,
+	match_command_keywords TEXT NOT NULL,
+	match_ports TEXT NOT NULL,
+	match_port_ranges TEXT NOT NULL,
+	sort_order INTEGER NOT NULL DEFAULT 1000,
+	created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);`
+
 // Store persists user-managed configuration.
 type Store struct {
 	db *sql.DB
 }
+
+var storeInitializeMu sync.Mutex
 
 // DefaultDatabasePath returns the SQLite database path for user configuration.
 func DefaultDatabasePath() (string, error) {
@@ -74,6 +92,8 @@ func NewStore(dbPath string) (*Store, error) {
 	db.SetMaxOpenConns(1)
 
 	store := &Store{db: db}
+	storeInitializeMu.Lock()
+	defer storeInitializeMu.Unlock()
 	if err := store.initialize(context.Background()); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -195,6 +215,12 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if _, err := s.db.ExecContext(ctx, createOperationLogsCreatedAtIndexSQL); err != nil {
 		return fmt.Errorf("initialize operation logs index: %w", err)
+	}
+	if _, err := s.db.ExecContext(ctx, createCleanupRulesTableSQL); err != nil {
+		return fmt.Errorf("initialize cleanup rules table: %w", err)
+	}
+	if err := s.seedDefaultCleanupRules(ctx); err != nil {
+		return fmt.Errorf("initialize cleanup rules: %w", err)
 	}
 
 	return nil

@@ -6,11 +6,17 @@ import {detail} from '../models';
 import {process} from '../models';
 import {main} from '../models';
 
+export function AddCleanupRule(arg1:config.CleanupRuleInput):Promise<Array<config.CleanupRule>>;
+
 export function AddCustomProtectedProcessName(arg1:string):Promise<config.ProtectionSettings>;
 
 export function AppName():Promise<string>;
 
+export function DeleteCleanupRule(arg1:string):Promise<Array<config.CleanupRule>>;
+
 export function DeleteCustomProtectedProcessName(arg1:string):Promise<config.ProtectionSettings>;
+
+export function GetCleanupRules():Promise<Array<config.CleanupRule>>;
 
 export function GetOperationLogs():Promise<Array<config.OperationLog>>;
 
@@ -29,3 +35,5 @@ export function GetSystemResourceInfo():Promise<main.SystemResourceInfo>;
 export function KillProcessByPID(arg1:number):Promise<process.OperationResult>;
 
 export function KillProcessByPort(arg1:number,arg2:string):Promise<process.OperationResult>;
+
+export function SetCleanupRuleEnabled(arg1:string,arg2:boolean):Promise<Array<config.CleanupRule>>;

@@ -14,13 +14,20 @@ const killProcessByPortMock = vi.fn();
 const getProtectionSettingsMock = vi.fn();
 const addCustomProtectedProcessNameMock = vi.fn();
 const deleteCustomProtectedProcessNameMock = vi.fn();
+const getCleanupRulesMock = vi.fn();
+const addCleanupRuleMock = vi.fn();
+const setCleanupRuleEnabledMock = vi.fn();
+const deleteCleanupRuleMock = vi.fn();
 const getOperationLogsMock = vi.fn();
 const getRecentOperationLogsForResourceMock = vi.fn();
 
 vi.mock('../wailsjs/go/main/App', () => ({
+    AddCleanupRule: (input: CleanupRuleInputFixture) => addCleanupRuleMock(input),
     AddCustomProtectedProcessName: (name: string) => addCustomProtectedProcessNameMock(name),
     AppName: () => new Promise(() => {}),
+    DeleteCleanupRule: (id: string) => deleteCleanupRuleMock(id),
     DeleteCustomProtectedProcessName: (name: string) => deleteCustomProtectedProcessNameMock(name),
+    GetCleanupRules: () => getCleanupRulesMock(),
     GetOperationLogs: () => getOperationLogsMock(),
     GetPortList: () => getPortListMock(),
     GetProcessDetail: (pid: number) => getProcessDetailMock(pid),
@@ -30,7 +37,27 @@ vi.mock('../wailsjs/go/main/App', () => ({
     GetSystemResourceInfo: () => getSystemResourceInfoMock(),
     KillProcessByPID: (pid: number) => killProcessByPIDMock(pid),
     KillProcessByPort: (port: number, protocol: string) => killProcessByPortMock(port, protocol),
+    SetCleanupRuleEnabled: (id: string, enabled: boolean) => setCleanupRuleEnabledMock(id, enabled),
 }));
+
+interface CleanupPortRangeFixture {
+    start: number;
+    end: number;
+}
+
+interface CleanupRuleInputFixture {
+    name: string;
+    enabled: boolean;
+    matchProcessNames: string[];
+    matchCommandKeywords: string[];
+    matchPorts: number[];
+    matchPortRanges: CleanupPortRangeFixture[];
+}
+
+interface CleanupRuleFixture extends CleanupRuleInputFixture {
+    id: string;
+    isBuiltin: boolean;
+}
 
 const nodeIconDataURL = 'data:image/png;base64,node-icon';
 
@@ -145,6 +172,41 @@ const protectionSettings = {
     customProcessNames: ['redis-server.exe'],
 };
 
+const cleanupRules: CleanupRuleFixture[] = [
+    {
+        id: 'builtin-node-vite',
+        name: 'Node/Vite',
+        enabled: true,
+        isBuiltin: true,
+        matchProcessNames: ['node.exe', 'npm', 'pnpm', 'yarn', 'vite'],
+        matchCommandKeywords: [],
+        matchPorts: [3000, 5173, 5174],
+        matchPortRanges: [],
+    },
+    {
+        id: 'builtin-database',
+        name: 'Database',
+        enabled: true,
+        isBuiltin: true,
+        matchProcessNames: ['redis-server', 'postgres', 'mysql'],
+        matchCommandKeywords: [],
+        matchPorts: [6379, 5432, 3306],
+        matchPortRanges: [],
+    },
+    {
+        id: 'custom-local-api',
+        name: 'Local API',
+        enabled: true,
+        isBuiltin: false,
+        matchProcessNames: ['custom-api.exe'],
+        matchCommandKeywords: ['--local-api'],
+        matchPorts: [9000],
+        matchPortRanges: [
+            {start: 9100, end: 9102},
+        ],
+    },
+];
+
 const operationLogs = [
     {
         id: 2,
@@ -247,6 +309,32 @@ describe('App layout navigation', () => {
             defaultProcessNames: protectionSettings.defaultProcessNames,
             customProcessNames: [],
         });
+        getCleanupRulesMock.mockReset();
+        getCleanupRulesMock.mockResolvedValue(cleanupRules);
+        addCleanupRuleMock.mockReset();
+        addCleanupRuleMock.mockResolvedValue([
+            ...cleanupRules,
+            {
+                id: 'custom-worker',
+                name: 'Worker',
+                enabled: true,
+                isBuiltin: false,
+                matchProcessNames: ['worker.exe'],
+                matchCommandKeywords: ['queue'],
+                matchPorts: [7001],
+                matchPortRanges: [
+                    {start: 7100, end: 7102},
+                ],
+            },
+        ]);
+        setCleanupRuleEnabledMock.mockReset();
+        setCleanupRuleEnabledMock.mockResolvedValue(cleanupRules.map((rule) => (
+            rule.id === 'builtin-node-vite'
+                ? {...rule, enabled: false}
+                : rule
+        )));
+        deleteCleanupRuleMock.mockReset();
+        deleteCleanupRuleMock.mockResolvedValue(cleanupRules.filter((rule) => rule.id !== 'custom-local-api'));
         getOperationLogsMock.mockReset();
         getOperationLogsMock.mockResolvedValue(operationLogs);
         getRecentOperationLogsForResourceMock.mockReset();
@@ -772,7 +860,7 @@ describe('App layout navigation', () => {
         expect(screen.getByText('Unable to load port list.')).toBeInTheDocument();
     });
 
-    it('loads Cleanup candidates into selectable rows with details and keeps protected processes unselectable', async () => {
+    it('loads Cleanup candidates from rules and shows matched rule reasons without protected processes', async () => {
         render(<App/>);
 
         fireEvent.click(screen.getByRole('button', {name: 'Cleanup'}));
@@ -783,20 +871,21 @@ describe('App layout navigation', () => {
         expect(screen.getByText('Candidates')).toBeInTheDocument();
         expect(screen.getByText('Selected')).toBeInTheDocument();
         expect(screen.getByText('postgres.exe')).toBeInTheDocument();
-        expect(screen.getByText('vmmem')).toBeInTheDocument();
+        expect(screen.queryByText('vmmem')).not.toBeInTheDocument();
         expect(screen.queryByText('chrome.exe')).not.toBeInTheDocument();
         expect(screen.getByText('3000')).toBeInTheDocument();
         expect(screen.getByText('5432')).toBeInTheDocument();
+        expect(screen.getByText('Node/Vite')).toBeInTheDocument();
+        expect(screen.getByText('Database')).toBeInTheDocument();
+        expect(screen.getByText('Node/Vite: process name node.exe; port 3000')).toBeInTheDocument();
+        expect(screen.getByText('Database: process name postgres; port 5432')).toBeInTheDocument();
 
         const nodeRow = screen.getByText('node.exe').closest('tr');
-        const protectedRow = screen.getByText('vmmem').closest('tr');
 
         expect(screen.queryByRole('complementary', {name: 'Cleanup detail'})).not.toBeInTheDocument();
         expect(nodeRow).not.toBeNull();
-        expect(protectedRow).not.toBeNull();
         expect(nodeRow).toHaveAttribute('tabindex', '0');
         expect(screen.getByRole('checkbox', {name: 'Select node.exe PID 100'})).not.toBeDisabled();
-        expect(screen.getByRole('checkbox', {name: 'Select vmmem PID 500'})).toBeDisabled();
 
         fireEvent.click(nodeRow as HTMLTableRowElement);
 
@@ -808,15 +897,11 @@ describe('App layout navigation', () => {
         expect(within(detailPanel).getByText('C:\\Program Files\\nodejs\\node.exe')).toBeInTheDocument();
         expect(within(detailPanel).getByText('node server.js')).toBeInTheDocument();
         expect(within(detailPanel).getByText('3000')).toBeInTheDocument();
+        expect(within(detailPanel).getByText('Node/Vite')).toBeInTheDocument();
+        expect(within(detailPanel).getByText('process name node.exe')).toBeInTheDocument();
+        expect(within(detailPanel).getByText('port 3000')).toBeInTheDocument();
         await waitFor(() => expect(within(detailPanel).getByText('kill_process_by_port')).toBeInTheDocument());
         expect(within(detailPanel).getByRole('button', {name: 'End Process'})).not.toBeDisabled();
-
-        fireEvent.click(protectedRow as HTMLTableRowElement);
-        await act(async () => {});
-
-        expect(protectedRow).toHaveAttribute('aria-selected', 'true');
-        expect(within(detailPanel).getByRole('heading', {name: 'vmmem PID 500'})).toBeInTheDocument();
-        expect(within(detailPanel).getByRole('button', {name: 'End Process'})).toBeDisabled();
     });
 
     it('keeps resource tables on the same process-first column model', async () => {
@@ -861,7 +946,8 @@ describe('App layout navigation', () => {
             'CPU',
             'Memory',
             'Ports',
-            'Protected',
+            'Rule',
+            'Reason',
         ]);
     });
 
@@ -982,6 +1068,55 @@ describe('App layout navigation', () => {
         await waitFor(() => expect(deleteCustomProtectedProcessNameMock).toHaveBeenCalledWith('redis-server.exe'));
         expect(await screen.findByText('No custom protected processes yet.')).toBeInTheDocument();
         expect(screen.getByText('Custom protected process removed.')).toBeInTheDocument();
+    });
+
+    it('loads Settings cleanup rules and supports toggling and deleting rules', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Settings'}));
+
+        expect(await screen.findByText('Cleanup rules')).toBeInTheDocument();
+        expect(screen.getByText('Node/Vite')).toBeInTheDocument();
+        expect(screen.getByText('Local API')).toBeInTheDocument();
+        expect(screen.getByText('node.exe, npm, pnpm, yarn, vite')).toBeInTheDocument();
+        expect(screen.getByText('3000, 5173, 5174')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', {name: 'Disable Node/Vite'}));
+
+        await waitFor(() => expect(setCleanupRuleEnabledMock).toHaveBeenCalledWith('builtin-node-vite', false));
+        expect(await screen.findByRole('button', {name: 'Enable Node/Vite'})).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', {name: 'Delete Local API'}));
+
+        await waitFor(() => expect(deleteCleanupRuleMock).toHaveBeenCalledWith('custom-local-api'));
+        expect(screen.queryByText('Local API')).not.toBeInTheDocument();
+    });
+
+    it('adds a cleanup rule from Settings', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Settings'}));
+        expect(await screen.findByText('Cleanup rules')).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Cleanup rule name'), {target: {value: 'Worker'}});
+        fireEvent.change(screen.getByLabelText('Process names'), {target: {value: 'worker.exe'}});
+        fireEvent.change(screen.getByLabelText('Command keywords'), {target: {value: 'queue'}});
+        fireEvent.change(screen.getByLabelText('Ports'), {target: {value: '7001'}});
+        fireEvent.change(screen.getByLabelText('Port ranges'), {target: {value: '7100-7102'}});
+        fireEvent.click(screen.getByRole('button', {name: 'Add cleanup rule'}));
+
+        await waitFor(() => expect(addCleanupRuleMock).toHaveBeenCalledWith({
+            name: 'Worker',
+            enabled: true,
+            matchProcessNames: ['worker.exe'],
+            matchCommandKeywords: ['queue'],
+            matchPorts: [7001],
+            matchPortRanges: [
+                {start: 7100, end: 7102},
+            ],
+        }));
+        expect(await screen.findByText('Worker')).toBeInTheDocument();
+        expect(screen.getByText('Cleanup rule added.')).toBeInTheDocument();
     });
 
     it('loads Logs in newest-first order and refreshes them automatically', async () => {

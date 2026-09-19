@@ -71,7 +71,7 @@ wails build -platform windows/amd64 -webview2 download -clean -nsis
 | NSIS 安装包 | `build/bin/*installer.exe` |
 | GitHub Actions artifact | `dev-resource-manager-windows-unsigned` |
 
-`wails.json` 中的 `info` 会写入 Windows 文件属性和安装包元数据；当前版本号为 `0.1.0`。
+`wails.json` 中的 `info` 会写入 Windows 文件属性和安装包元数据；当前版本号为 `1.0.1`。
 
 ## 验证安装包
 
@@ -124,7 +124,9 @@ npm --prefix frontend run build
 
 ## GitHub Actions
 
-手动构建:
+`Windows Release Build` 会在 `main` 分支更新时自动运行，也可以手动触发。
+
+手动触发:
 
 1. 打开 GitHub 仓库的 "Actions"。
 2. 选择 "Windows Release Build"。
