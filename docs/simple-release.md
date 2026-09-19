@@ -19,4 +19,4 @@ git push origin v1.0.0（版本号）
 去GitHub创建Release，把安装包拖进去
 
 
-Get-FileHash "D:\Projects\Dev-Resource-Manager\build\bin\Dev-Resource-Manager-amd64-installer.exe" -Algorithm SHA256 
+Get-FileHash ".\build\bin\openend-amd64-installer.exe" -Algorithm SHA256

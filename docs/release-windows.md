@@ -1,6 +1,6 @@
 # Windows Release
 
-本文档说明 Dev Resource Manager 的 Windows 构建、未签名安装包验证、签名预留和 GitHub Release 发布流程。
+本文档说明 OpenEnd 的 Windows 构建、未签名安装包验证、签名预留和 GitHub Release 发布流程。
 
 ## 环境要求
 
@@ -67,11 +67,11 @@ wails build -platform windows/amd64 -webview2 download -clean -nsis
 
 | 产物 | 位置 |
 | --- | --- |
-| 应用程序 exe | `build/bin/dev-resource-manager.exe` |
+| 应用程序 exe | `build/bin/openend.exe` |
 | NSIS 安装包 | `build/bin/*installer.exe` |
-| GitHub Actions artifact | `dev-resource-manager-windows-unsigned` |
+| GitHub Actions artifact | `openend-windows-unsigned` |
 
-`wails.json` 中的 `info` 会写入 Windows 文件属性和安装包元数据；当前版本号为 `1.0.1`。
+`wails.json` 中的 `info` 会写入 Windows 文件属性和安装包元数据；当前版本号为 `1.0.2`。
 
 ## 验证安装包
 
@@ -79,7 +79,7 @@ wails build -platform windows/amd64 -webview2 download -clean -nsis
 
 1. 执行 `.\scripts\package-windows.ps1`。
 2. 打开 `build/bin/*installer.exe` 并完成安装。
-3. 从开始菜单或桌面快捷方式启动 Dev Resource Manager。
+3. 从开始菜单或桌面快捷方式启动 OpenEnd。
 4. 验证主要页面能打开，进程、端口、资源数据能正常显示。
 5. 在 Windows "设置 > 应用" 中卸载。
 6. 确认开始菜单/桌面快捷方式移除，安装目录不再残留核心程序文件。
@@ -115,7 +115,7 @@ npm --prefix frontend run build
 2. 将证书内容以 Base64 写入 GitHub Actions Secrets，例如 `WINDOWS_SIGNING_CERT_BASE64`。
 3. 将证书密码写入 GitHub Actions Secrets，例如 `WINDOWS_SIGNING_CERT_PASSWORD`。
 4. 在 CI 中把证书解码到临时目录，构建结束后删除临时文件。
-5. 对 `build/bin/dev-resource-manager.exe` 签名。
+5. 对 `build/bin/openend.exe` 签名。
 6. 生成 NSIS 安装包，并对最终 `*installer.exe` 签名。
 7. 如需签名卸载程序，可启用 `build/windows/installer/project.nsi` 中保留的 `#!uninstfinalize` 和 `#!finalize` 模板，并把证书路径和密码改为 CI 注入值。
 8. 使用 `Get-AuthenticodeSignature` 验证签名状态。
@@ -132,7 +132,7 @@ npm --prefix frontend run build
 2. 选择 "Windows Release Build"。
 3. 点击 "Run workflow"。
 4. 等待 workflow 完成。
-5. 下载 artifact `dev-resource-manager-windows-unsigned`。
+5. 下载 artifact `openend-windows-unsigned`。
 
 workflow 会执行:
 
@@ -144,7 +144,7 @@ checkout -> setup Go -> setup Node -> npm install -> install Wails -> install NS
 
 当前建议使用人工确认后的 Release 流程:
 
-1. 从成功的 Actions run 下载 `dev-resource-manager-windows-unsigned`。
+1. 从成功的 Actions run 下载 `openend-windows-unsigned`。
 2. 在测试机上完成安装、启动、卸载验证。
 3. 创建版本标签，例如 `v0.1.0`。
 4. 在 GitHub 新建 Release，上传 `build/bin/*installer.exe` 和必要的校验文件。

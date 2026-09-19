@@ -1,8 +1,8 @@
 package main
 
 import (
-	"dev-resource-manager/internal/resource"
 	"net"
+	"openend/internal/resource"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -39,7 +39,7 @@ func TestCollectSystemResourceInfoRunsCollectorsConcurrently(t *testing.T) {
 	}()
 
 	markStarted := func() {
-		if started.Add(1) == 5 {
+		if started.Add(1) == 8 {
 			close(allStarted)
 		}
 		<-release
@@ -51,6 +51,15 @@ func TestCollectSystemResourceInfoRunsCollectorsConcurrently(t *testing.T) {
 			CPUPercent: func() float64 {
 				markStarted()
 				return 12.3
+			},
+			CPUInfo: func() cpuResourceInfo {
+				markStarted()
+				return cpuResourceInfo{
+					Name:              "Test CPU",
+					PhysicalCores:     8,
+					LogicalProcessors: 16,
+					MaxMHz:            3200,
+				}
 			},
 			Memory: func() memoryResourceInfo {
 				markStarted()
@@ -64,6 +73,7 @@ func TestCollectSystemResourceInfoRunsCollectorsConcurrently(t *testing.T) {
 				markStarted()
 				return resource.GPUInfo{
 					GPUPercent:     21.5,
+					Names:          []string{"Test GPU"},
 					TotalVRAMBytes: 80,
 					UsedVRAMBytes:  20,
 					FreeVRAMBytes:  60,
@@ -73,9 +83,17 @@ func TestCollectSystemResourceInfoRunsCollectorsConcurrently(t *testing.T) {
 				markStarted()
 				return 7
 			},
+			ThreadCount: func() int {
+				markStarted()
+				return 70
+			},
 			PortCount: func() int {
 				markStarted()
 				return 3
+			},
+			Uptime: func() uint64 {
+				markStarted()
+				return 3600
 			},
 		})
 	}()
@@ -91,7 +109,7 @@ func TestCollectSystemResourceInfoRunsCollectorsConcurrently(t *testing.T) {
 
 	select {
 	case info := <-result:
-		if info.CPUPercent != 12.3 || info.TotalMemoryBytes != 100 || info.GPUPercent != 21.5 || info.ProcessCount != 7 || info.PortCount != 3 {
+		if info.CPUPercent != 12.3 || info.CPUName != "Test CPU" || info.CPUPhysicalCores != 8 || info.CPULogicalProcessors != 16 || info.CPUMaxMHz != 3200 || info.TotalMemoryBytes != 100 || info.GPUPercent != 21.5 || len(info.GPUNames) != 1 || info.GPUNames[0] != "Test GPU" || info.ProcessCount != 7 || info.ThreadCount != 70 || info.PortCount != 3 || info.UptimeSeconds != 3600 {
 			t.Fatalf("unexpected resource info: %+v", info)
 		}
 	case <-time.After(150 * time.Millisecond):

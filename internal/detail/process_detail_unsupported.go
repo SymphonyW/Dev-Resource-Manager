@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"runtime"
 
-	processscanner "dev-resource-manager/internal/process"
+	processscanner "openend/internal/process"
 )
 
 // ReadProcessSnapshot is implemented only for Windows because this app targets Windows process management.

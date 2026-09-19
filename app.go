@@ -7,13 +7,14 @@ import (
 	"strings"
 	"sync"
 
-	"dev-resource-manager/internal/config"
-	processdetail "dev-resource-manager/internal/detail"
-	portscanner "dev-resource-manager/internal/port"
-	processscanner "dev-resource-manager/internal/process"
-	"dev-resource-manager/internal/resource"
+	"openend/internal/config"
+	processdetail "openend/internal/detail"
+	portscanner "openend/internal/port"
+	processscanner "openend/internal/process"
+	"openend/internal/resource"
 
 	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/net"
 	gopsprocess "github.com/shirou/gopsutil/v3/process"
@@ -21,16 +22,23 @@ import (
 
 // SystemResourceInfo is the resource snapshot returned to the frontend.
 type SystemResourceInfo struct {
-	CPUPercent       float64 `json:"cpuPercent"`
-	TotalMemoryBytes uint64  `json:"totalMemoryBytes"`
-	UsedMemoryBytes  uint64  `json:"usedMemoryBytes"`
-	FreeMemoryBytes  uint64  `json:"freeMemoryBytes"`
-	GPUPercent       float64 `json:"gpuPercent"`
-	TotalVRAMBytes   uint64  `json:"totalVRAMBytes"`
-	UsedVRAMBytes    uint64  `json:"usedVRAMBytes"`
-	FreeVRAMBytes    uint64  `json:"freeVRAMBytes"`
-	ProcessCount     int     `json:"processCount"`
-	PortCount        int     `json:"portCount"`
+	CPUPercent           float64  `json:"cpuPercent"`
+	CPUName              string   `json:"cpuName"`
+	CPUPhysicalCores     int      `json:"cpuPhysicalCores"`
+	CPULogicalProcessors int      `json:"cpuLogicalProcessors"`
+	CPUMaxMHz            float64  `json:"cpuMaxMHz"`
+	TotalMemoryBytes     uint64   `json:"totalMemoryBytes"`
+	UsedMemoryBytes      uint64   `json:"usedMemoryBytes"`
+	FreeMemoryBytes      uint64   `json:"freeMemoryBytes"`
+	GPUPercent           float64  `json:"gpuPercent"`
+	GPUNames             []string `json:"gpuNames"`
+	TotalVRAMBytes       uint64   `json:"totalVRAMBytes"`
+	UsedVRAMBytes        uint64   `json:"usedVRAMBytes"`
+	FreeVRAMBytes        uint64   `json:"freeVRAMBytes"`
+	ProcessCount         int      `json:"processCount"`
+	ThreadCount          int      `json:"threadCount"`
+	PortCount            int      `json:"portCount"`
+	UptimeSeconds        uint64   `json:"uptimeSeconds"`
 }
 
 // App struct
@@ -51,7 +59,7 @@ func (a *App) startup(ctx context.Context) {
 
 // AppName returns the desktop application name through the Wails binding.
 func (a *App) AppName() string {
-	return "Dev Resource Manager"
+	return "OpenEnd"
 }
 
 // GetSystemResourceInfo returns a best-effort snapshot of local system usage.
@@ -69,37 +77,60 @@ type memoryResourceInfo struct {
 	FreeBytes  uint64
 }
 
+type cpuResourceInfo struct {
+	Name              string
+	PhysicalCores     int
+	LogicalProcessors int
+	MaxMHz            float64
+}
+
 type systemResourceCollectors struct {
 	CPUPercent   func() float64
+	CPUInfo      func() cpuResourceInfo
 	Memory       func() memoryResourceInfo
 	GPU          func() resource.GPUInfo
 	ProcessCount func() int
+	ThreadCount  func() int
 	PortCount    func() int
+	Uptime       func() uint64
 }
 
 func defaultSystemResourceCollectors() systemResourceCollectors {
 	return systemResourceCollectors{
 		CPUPercent:   collectCPUPercent,
+		CPUInfo:      collectCPUResourceInfo,
 		Memory:       collectMemoryResourceInfo,
 		GPU:          resource.GetGPUInfo,
 		ProcessCount: collectProcessCount,
+		ThreadCount:  collectThreadCount,
 		PortCount:    collectPortCount,
+		Uptime:       collectUptimeSeconds,
 	}
 }
 
 func collectSystemResourceInfo(collectors systemResourceCollectors) SystemResourceInfo {
 	var cpuPercent float64
+	var cpuInfo cpuResourceInfo
 	var memoryInfo memoryResourceInfo
 	var gpuInfo resource.GPUInfo
 	var processCount int
+	var threadCount int
 	var portCount int
+	var uptimeSeconds uint64
 	var waitGroup sync.WaitGroup
-	waitGroup.Add(5)
+	waitGroup.Add(8)
 
 	go func() {
 		defer waitGroup.Done()
 		if collectors.CPUPercent != nil {
 			cpuPercent = collectors.CPUPercent()
+		}
+	}()
+
+	go func() {
+		defer waitGroup.Done()
+		if collectors.CPUInfo != nil {
+			cpuInfo = collectors.CPUInfo()
 		}
 	}()
 
@@ -128,23 +159,44 @@ func collectSystemResourceInfo(collectors systemResourceCollectors) SystemResour
 
 	go func() {
 		defer waitGroup.Done()
+		if collectors.ThreadCount != nil {
+			threadCount = collectors.ThreadCount()
+		}
+	}()
+
+	go func() {
+		defer waitGroup.Done()
 		if collectors.PortCount != nil {
 			portCount = collectors.PortCount()
 		}
 	}()
 
+	go func() {
+		defer waitGroup.Done()
+		if collectors.Uptime != nil {
+			uptimeSeconds = collectors.Uptime()
+		}
+	}()
+
 	waitGroup.Wait()
 	return SystemResourceInfo{
-		CPUPercent:       cpuPercent,
-		TotalMemoryBytes: memoryInfo.TotalBytes,
-		UsedMemoryBytes:  memoryInfo.UsedBytes,
-		FreeMemoryBytes:  memoryInfo.FreeBytes,
-		GPUPercent:       gpuInfo.GPUPercent,
-		TotalVRAMBytes:   gpuInfo.TotalVRAMBytes,
-		UsedVRAMBytes:    gpuInfo.UsedVRAMBytes,
-		FreeVRAMBytes:    gpuInfo.FreeVRAMBytes,
-		ProcessCount:     processCount,
-		PortCount:        portCount,
+		CPUPercent:           cpuPercent,
+		CPUName:              cpuInfo.Name,
+		CPUPhysicalCores:     cpuInfo.PhysicalCores,
+		CPULogicalProcessors: cpuInfo.LogicalProcessors,
+		CPUMaxMHz:            cpuInfo.MaxMHz,
+		TotalMemoryBytes:     memoryInfo.TotalBytes,
+		UsedMemoryBytes:      memoryInfo.UsedBytes,
+		FreeMemoryBytes:      memoryInfo.FreeBytes,
+		GPUPercent:           gpuInfo.GPUPercent,
+		GPUNames:             gpuInfo.Names,
+		TotalVRAMBytes:       gpuInfo.TotalVRAMBytes,
+		UsedVRAMBytes:        gpuInfo.UsedVRAMBytes,
+		FreeVRAMBytes:        gpuInfo.FreeVRAMBytes,
+		ProcessCount:         processCount,
+		ThreadCount:          threadCount,
+		PortCount:            portCount,
+		UptimeSeconds:        uptimeSeconds,
 	}
 }
 
@@ -156,6 +208,34 @@ func collectCPUPercent() float64 {
 	}
 
 	return roundOneDecimal(percentages[0])
+}
+
+func collectCPUResourceInfo() cpuResourceInfo {
+	var info cpuResourceInfo
+
+	cpuStats, err := cpu.Info()
+	if err == nil {
+		for _, stat := range cpuStats {
+			if info.Name == "" {
+				info.Name = strings.TrimSpace(stat.ModelName)
+			}
+			if stat.Mhz > info.MaxMHz {
+				info.MaxMHz = stat.Mhz
+			}
+			if info.PhysicalCores <= 0 && stat.Cores > 0 {
+				info.PhysicalCores = int(stat.Cores)
+			}
+		}
+	}
+
+	if physicalCores, err := cpu.Counts(false); err == nil && physicalCores > 0 {
+		info.PhysicalCores = physicalCores
+	}
+	if logicalProcessors, err := cpu.Counts(true); err == nil && logicalProcessors > 0 {
+		info.LogicalProcessors = logicalProcessors
+	}
+
+	return info
 }
 
 func collectMemoryResourceInfo() memoryResourceInfo {
@@ -182,6 +262,23 @@ func collectProcessCount() int {
 	return len(pids)
 }
 
+func collectThreadCount() int {
+	processes, err := gopsprocess.Processes()
+	if err != nil {
+		return 0
+	}
+
+	var threadCount int32
+	for _, process := range processes {
+		count, err := process.NumThreads()
+		if err == nil && count > 0 {
+			threadCount += count
+		}
+	}
+
+	return int(threadCount)
+}
+
 func collectPortCount() int {
 	connections, err := net.Connections("inet")
 	if err != nil {
@@ -197,6 +294,15 @@ func collectPortCount() int {
 	}
 
 	return len(ports)
+}
+
+func collectUptimeSeconds() uint64 {
+	uptime, err := host.Uptime()
+	if err != nil {
+		return 0
+	}
+
+	return uptime
 }
 
 // GetProcessList returns the current Windows process list for the frontend.

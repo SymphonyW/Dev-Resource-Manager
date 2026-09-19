@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"dev-resource-manager/internal/config"
+	"openend/internal/config"
 
 	gopsprocess "github.com/shirou/gopsutil/v3/process"
 	"golang.org/x/sys/windows"

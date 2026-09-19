@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"runtime"
 
-	processscanner "dev-resource-manager/internal/process"
+	processscanner "openend/internal/process"
 )
 
 // List is implemented only for Windows because this app currently targets Windows port management.

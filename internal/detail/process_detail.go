@@ -4,8 +4,8 @@ import (
 	"sort"
 	"strings"
 
-	"dev-resource-manager/internal/config"
-	portscanner "dev-resource-manager/internal/port"
+	"openend/internal/config"
+	portscanner "openend/internal/port"
 )
 
 const defaultRecentLogLimit = 8

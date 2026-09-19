@@ -11,6 +11,7 @@ func TestBuildGPUInfoClampsAggregatedEngineUsage(t *testing.T) {
 		[]gpuMemoryCounter{
 			{DedicatedUsage: 3 * 1024 * 1024 * 1024},
 		},
+		[]string{"NVIDIA GeForce RTX"},
 		8*1024*1024*1024,
 	)
 
@@ -28,6 +29,7 @@ func TestBuildGPUInfoCalculatesVRAMUsage(t *testing.T) {
 			{DedicatedUsage: 2 * 1024 * 1024 * 1024},
 			{DedicatedUsage: 1024 * 1024 * 1024},
 		},
+		[]string{"NVIDIA GeForce RTX", "NVIDIA GeForce RTX", ""},
 		8*1024*1024*1024,
 	)
 
@@ -42,6 +44,9 @@ func TestBuildGPUInfoCalculatesVRAMUsage(t *testing.T) {
 	}
 	if info.FreeVRAMBytes != 5*1024*1024*1024 {
 		t.Fatalf("expected free VRAM to be calculated, got %d", info.FreeVRAMBytes)
+	}
+	if len(info.Names) != 1 || info.Names[0] != "NVIDIA GeForce RTX" {
+		t.Fatalf("expected duplicate GPU names to be removed, got %v", info.Names)
 	}
 }
 

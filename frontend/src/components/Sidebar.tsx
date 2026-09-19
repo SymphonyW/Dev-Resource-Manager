@@ -5,20 +5,18 @@ import type {Translator} from '../services/i18n';
 
 interface SidebarProps {
     activePageId: PageId;
-    bridgeStatus: string;
-    isConnected: boolean;
     pages: PageDefinition[];
     t: Translator;
     onSelectPage: (pageId: PageId) => void;
 }
 
-function Sidebar({activePageId, bridgeStatus, isConnected, pages, t, onSelectPage}: SidebarProps) {
+function Sidebar({activePageId, pages, t, onSelectPage}: SidebarProps) {
     const [collapsed, setCollapsed] = useState(false);
     return (
         <aside className={collapsed ? 'sidebar is-collapsed' : 'sidebar'} aria-label={t('sidebar.navigation')}>
             <div className="sidebar-brand">
                 <span className="app-mark"><Icon name="app" size={22}/></span>
-                <span className="brand-label">Dev Resource<span>Manager</span></span>
+                <span className="brand-label">OpenEnd</span>
             </div>
             <button className="nav-toggle" type="button" aria-label={t('sidebar.toggle')} aria-expanded={!collapsed} onClick={() => setCollapsed(!collapsed)}>
                 <Icon name="menu" size={18}/>
@@ -39,11 +37,6 @@ function Sidebar({activePageId, bridgeStatus, isConnected, pages, t, onSelectPag
                     </button>
                 ))}
             </nav>
-
-            <div className={isConnected ? 'bridge-status connected' : 'bridge-status'} title={bridgeStatus} role="status">
-                <span className="status-dot" aria-hidden="true"/>
-                <span className="bridge-label">{bridgeStatus}</span>
-            </div>
         </aside>
     );
 }

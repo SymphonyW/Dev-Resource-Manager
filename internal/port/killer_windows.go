@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	processscanner "dev-resource-manager/internal/process"
+	processscanner "openend/internal/process"
 
 	gopsnet "github.com/shirou/gopsutil/v3/net"
 )

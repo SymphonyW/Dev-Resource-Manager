@@ -62,7 +62,7 @@ func DefaultDatabasePath() (string, error) {
 		return "", fmt.Errorf("resolve user config directory: %w", err)
 	}
 
-	return filepath.Join(configDir, "Dev Resource Manager", "settings.sqlite3"), nil
+	return filepath.Join(configDir, "OpenEnd", "settings.sqlite3"), nil
 }
 
 // NewDefaultStore opens the default user configuration database.

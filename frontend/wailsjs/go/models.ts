@@ -224,15 +224,22 @@ export namespace main {
 	
 	export class SystemResourceInfo {
 	    cpuPercent: number;
+	    cpuName: string;
+	    cpuPhysicalCores: number;
+	    cpuLogicalProcessors: number;
+	    cpuMaxMHz: number;
 	    totalMemoryBytes: number;
 	    usedMemoryBytes: number;
 	    freeMemoryBytes: number;
 	    gpuPercent: number;
+	    gpuNames: string[];
 	    totalVRAMBytes: number;
 	    usedVRAMBytes: number;
 	    freeVRAMBytes: number;
 	    processCount: number;
+	    threadCount: number;
 	    portCount: number;
+	    uptimeSeconds: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new SystemResourceInfo(source);
@@ -241,15 +248,22 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.cpuPercent = source["cpuPercent"];
+	        this.cpuName = source["cpuName"];
+	        this.cpuPhysicalCores = source["cpuPhysicalCores"];
+	        this.cpuLogicalProcessors = source["cpuLogicalProcessors"];
+	        this.cpuMaxMHz = source["cpuMaxMHz"];
 	        this.totalMemoryBytes = source["totalMemoryBytes"];
 	        this.usedMemoryBytes = source["usedMemoryBytes"];
 	        this.freeMemoryBytes = source["freeMemoryBytes"];
 	        this.gpuPercent = source["gpuPercent"];
+	        this.gpuNames = source["gpuNames"];
 	        this.totalVRAMBytes = source["totalVRAMBytes"];
 	        this.usedVRAMBytes = source["usedVRAMBytes"];
 	        this.freeVRAMBytes = source["freeVRAMBytes"];
 	        this.processCount = source["processCount"];
+	        this.threadCount = source["threadCount"];
 	        this.portCount = source["portCount"];
+	        this.uptimeSeconds = source["uptimeSeconds"];
 	    }
 	}
 

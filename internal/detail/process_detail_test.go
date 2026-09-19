@@ -3,8 +3,8 @@ package detail
 import (
 	"testing"
 
-	"dev-resource-manager/internal/config"
-	portscanner "dev-resource-manager/internal/port"
+	"openend/internal/config"
+	portscanner "openend/internal/port"
 )
 
 func TestBuildProcessDetailAggregatesPortsLogsAndAccessWarnings(t *testing.T) {

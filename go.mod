@@ -1,4 +1,4 @@
-module dev-resource-manager
+module openend
 
 go 1.24.0
 
