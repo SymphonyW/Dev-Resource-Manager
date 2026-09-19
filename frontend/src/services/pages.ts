@@ -41,6 +41,13 @@ export function getPages(t: Translator): PageDefinition[] {
             eyebrow: t('page.logs.eyebrow'),
         },
         {
+            id: 'feedback',
+            label: t('page.feedback.label'),
+            title: t('page.feedback.title'),
+            description: t('page.feedback.description'),
+            eyebrow: t('page.feedback.eyebrow'),
+        },
+        {
             id: 'settings',
             label: t('page.settings.label'),
             title: t('page.settings.title'),

@@ -10,6 +10,7 @@ const paths: Record<IconName, string> = {
     ports: 'M8 3v5m8-5v5M6 8h12v4a6 6 0 0 1-12 0V8zm6 10v3',
     cleanup: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5m4-5v5',
     logs: 'M6 3h9l4 4v14H6zM14 3v5h5M9 12h7m-7 4h7',
+    feedback: 'M4 5h16v11H8l-4 4V5zm4 4h8m-8 4h5',
     settings: 'M9 3h6l.6 3 2.6 1.5 2.8-1 3 5.2-2.2 2 .1 3 2.1 2-3 5.2-2.8-1-2.6 1.5L15 27H9l-.6-3-2.6-1.5-2.8 1-3-5.2 2.2-2-.1-3-2.1-2 3-5.2 2.8 1L8.4 6 9 3z',
 };
 

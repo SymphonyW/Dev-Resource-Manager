@@ -1,5 +1,5 @@
-import {useCallback, useMemo, useState} from 'react';
-import type {KeyboardEvent} from 'react';
+import {useCallback, useEffect, useMemo, useState} from 'react';
+import type {KeyboardEvent, MouseEvent} from 'react';
 import ProcessNameCell from '../components/ProcessNameCell';
 import ScrollableDataTable from '../components/ScrollableDataTable';
 import StatusMessage from '../components/StatusMessage';
@@ -24,6 +24,13 @@ interface KillTarget {
     name: string;
     path: string;
     memoryBytes: number;
+    isProtected: boolean;
+}
+
+interface ProcessContextMenu {
+    process: ProcessInfo;
+    x: number;
+    y: number;
 }
 
 function ProcessesPage({page, t}: ProcessesPageProps) {
@@ -41,6 +48,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
     const [processDetail, setProcessDetail] = useState<ProcessDetail | null>(null);
     const [isDetailLoading, setIsDetailLoading] = useState(false);
     const [detailErrorMessage, setDetailErrorMessage] = useState('');
+    const [contextMenu, setContextMenu] = useState<ProcessContextMenu | null>(null);
 
     const loadProcesses = useCallback(async (showLoading = true) => {
         if (showLoading) {
@@ -85,6 +93,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
 
     const openProcessDetail = (process: ProcessInfo) => {
         setOperationMessage('');
+        setContextMenu(null);
         setSelectedDetailPID(process.pid);
         setProcessDetail(null);
         void loadDetail(process.pid);
@@ -96,13 +105,33 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
         setDetailErrorMessage('');
     };
 
-    const openDetailKillConfirmation = (detail: ProcessDetail) => {
+    const openKillConfirmation = (target: KillTarget) => {
+        if (target.isProtected) {
+            return;
+        }
+
         setOperationMessage('');
-        setProcessToKill({
+        setContextMenu(null);
+        setProcessToKill(target);
+    };
+
+    const openDetailKillConfirmation = (detail: ProcessDetail) => {
+        openKillConfirmation({
             pid: detail.pid,
             name: detail.processName,
             path: detail.executablePath,
             memoryBytes: detail.memoryBytes,
+            isProtected: detail.isProtected,
+        });
+    };
+
+    const openRowKillConfirmation = (process: ProcessInfo) => {
+        openKillConfirmation({
+            pid: process.pid,
+            name: process.name,
+            path: process.path,
+            memoryBytes: process.memoryBytes,
+            isProtected: process.isProtected,
         });
     };
 
@@ -121,8 +150,40 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
         openProcessDetail(process);
     };
 
+    const handleProcessRowContextMenu = (event: MouseEvent<HTMLTableRowElement>, process: ProcessInfo) => {
+        event.preventDefault();
+        setOperationMessage('');
+        setContextMenu({
+            process,
+            x: event.clientX,
+            y: event.clientY,
+        });
+    };
+
+    useEffect(() => {
+        if (!contextMenu) {
+            return undefined;
+        }
+
+        const closeContextMenu = () => setContextMenu(null);
+        const closeContextMenuOnEscape = (event: globalThis.KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                closeContextMenu();
+            }
+        };
+
+        window.addEventListener('click', closeContextMenu);
+        window.addEventListener('contextmenu', closeContextMenu);
+        window.addEventListener('keydown', closeContextMenuOnEscape);
+        return () => {
+            window.removeEventListener('click', closeContextMenu);
+            window.removeEventListener('contextmenu', closeContextMenu);
+            window.removeEventListener('keydown', closeContextMenuOnEscape);
+        };
+    }, [contextMenu]);
+
     const confirmKillProcess = async () => {
-        if (!processToKill) {
+        if (!processToKill || processToKill.isProtected) {
             return;
         }
 
@@ -254,7 +315,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                 {visibleProcesses.map((process) => {
                                     const commandLine = process.commandLine || t('common.unavailable');
                                     const path = process.path || t('common.unavailable');
-                                    const isSelected = selectedDetailPID === process.pid;
+                                    const isSelected = selectedDetailPID === process.pid || contextMenu?.process.pid === process.pid;
                                     const ownedPorts = portsByPID.get(process.pid) ?? [];
 
                                     return (
@@ -263,6 +324,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                             aria-selected={isSelected}
                                             className={processRowClassName(process, isSelected)}
                                             onClick={() => openProcessDetail(process)}
+                                            onContextMenu={(event) => handleProcessRowContextMenu(event, process)}
                                             onKeyDown={(event) => handleProcessRowKeyDown(event, process)}
                                             tabIndex={0}
                                         >
@@ -308,15 +370,29 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                 <h2>{processDetail?.processName ? `${processDetail.processName} PID ${processDetail.pid}` : t('detail.process.aria')}</h2>
                             </div>
                             {selectedDetailPID !== null && (
-                                <button
-                                    aria-label={t('common.close')}
-                                    className="dialog-close-button"
-                                    type="button"
-                                    onClick={closeProcessDetail}
-                                    disabled={isKilling}
-                                >
-                                    {t('common.close')}
-                                </button>
+                                <div className="detail-header-actions">
+                                    <button
+                                        className="danger-button"
+                                        type="button"
+                                        disabled={!processDetail || processDetail.isProtected || isKilling}
+                                        onClick={() => {
+                                            if (processDetail) {
+                                                openDetailKillConfirmation(processDetail);
+                                            }
+                                        }}
+                                    >
+                                        {t('terminate.process')}
+                                    </button>
+                                    <button
+                                        aria-label={t('common.close')}
+                                        className="dialog-close-button"
+                                        type="button"
+                                        onClick={closeProcessDetail}
+                                        disabled={isKilling}
+                                    >
+                                        {t('common.close')}
+                                    </button>
+                                </div>
                             )}
                         </div>
 
@@ -416,20 +492,37 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                     )}
                                 </div>
 
-                                <div className="detail-actions">
-                                    <button
-                                        className="danger-button"
-                                        type="button"
-                                        disabled={processDetail.isProtected || isKilling}
-                                        onClick={() => openDetailKillConfirmation(processDetail)}
-                                    >
-                                        {t('terminate.process')}
-                                    </button>
-                                </div>
                             </div>
                         )}
                     </aside>
                     )}
+                </div>
+            )}
+
+            {contextMenu && (
+                <div
+                    className="process-context-menu"
+                    role="menu"
+                    style={{left: contextMenu.x, top: contextMenu.y}}
+                    onClick={(event) => event.stopPropagation()}
+                    onContextMenu={(event) => event.preventDefault()}
+                >
+                    <button
+                        role="menuitem"
+                        type="button"
+                        onClick={() => openProcessDetail(contextMenu.process)}
+                    >
+                        {t('processes.details')}
+                    </button>
+                    <button
+                        className="danger-menu-item"
+                        role="menuitem"
+                        type="button"
+                        disabled={contextMenu.process.isProtected || isKilling}
+                        onClick={() => openRowKillConfirmation(contextMenu.process)}
+                    >
+                        {t('terminate.process')}
+                    </button>
                 </div>
             )}
 

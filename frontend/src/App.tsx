@@ -10,12 +10,8 @@ import {
 } from './services/i18n';
 import {defaultPageId, getPageById, getPages} from './services/pages';
 import type {PageId} from './types/navigation';
-import {AppName} from '../wailsjs/go/main/App';
-
-type BridgeStatus = 'connecting' | 'connected' | 'unavailable';
 
 function App() {
-    const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus>('connecting');
     const [activePageId, setActivePageId] = useState<PageId>(defaultPageId);
     const [language, setLanguage] = useState<LanguageCode>(() => resolveInitialLanguage());
 
@@ -23,23 +19,10 @@ function App() {
     const pages = useMemo(() => getPages(t), [t]);
 
     useEffect(() => {
-        Promise.resolve().then(() => AppName())
-            .then(() => {
-                setBridgeStatus('connected');
-            })
-            .catch(() => setBridgeStatus('unavailable'));
-    }, []);
-
-    useEffect(() => {
         document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en';
     }, [language]);
 
     const activePage = getPageById(activePageId, pages);
-    const bridgeStatusLabel = bridgeStatus === 'connected'
-        ? t('bridge.connected')
-        : bridgeStatus === 'unavailable'
-            ? t('bridge.unavailable')
-            : t('bridge.connecting');
 
     const handleLanguageChange = (nextLanguage: LanguageCode) => {
         setLanguage(nextLanguage);
@@ -50,8 +33,6 @@ function App() {
         <div className="app-shell">
             <Sidebar
                 activePageId={activePageId}
-                bridgeStatus={bridgeStatusLabel}
-                isConnected={bridgeStatus === 'connected'}
                 pages={pages}
                 t={t}
                 onSelectPage={setActivePageId}
@@ -59,7 +40,6 @@ function App() {
             <main className="main-content">
                 <header className="workspace-header">
                     <h1>{activePage.label}</h1>
-                    <span className="workspace-context">{t('app.localComputer')}</span>
                 </header>
                 <div className="workspace-body" key={activePageId}>
                     <PagePanel

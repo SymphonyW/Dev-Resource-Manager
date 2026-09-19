@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"dev-resource-manager/internal/config"
+	"openend/internal/config"
 )
 
 func TestIsProtectedNameRecognizesDefaultWindowsProcesses(t *testing.T) {

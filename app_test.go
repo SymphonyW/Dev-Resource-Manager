@@ -1,8 +1,8 @@
 package main
 
 import (
-	"dev-resource-manager/internal/resource"
 	"net"
+	"openend/internal/resource"
 	"sync/atomic"
 	"testing"
 	"time"

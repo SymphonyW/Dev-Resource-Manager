@@ -5,13 +5,13 @@
 !include "FileFunc.nsh"
 
 !ifndef INFO_PROJECTNAME
-    !define INFO_PROJECTNAME "dev-resource-manager"
+    !define INFO_PROJECTNAME "openend"
 !endif
 !ifndef INFO_COMPANYNAME
     !define INFO_COMPANYNAME "SymphonyW"
 !endif
 !ifndef INFO_PRODUCTNAME
-    !define INFO_PRODUCTNAME "Dev Resource Manager"
+    !define INFO_PRODUCTNAME "OpenEnd"
 !endif
 !ifndef INFO_PRODUCTVERSION
     !define INFO_PRODUCTVERSION "1.0.2"

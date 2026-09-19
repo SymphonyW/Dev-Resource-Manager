@@ -7,11 +7,11 @@ import (
 	"strings"
 	"sync"
 
-	"dev-resource-manager/internal/config"
-	processdetail "dev-resource-manager/internal/detail"
-	portscanner "dev-resource-manager/internal/port"
-	processscanner "dev-resource-manager/internal/process"
-	"dev-resource-manager/internal/resource"
+	"openend/internal/config"
+	processdetail "openend/internal/detail"
+	portscanner "openend/internal/port"
+	processscanner "openend/internal/process"
+	"openend/internal/resource"
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
@@ -51,7 +51,7 @@ func (a *App) startup(ctx context.Context) {
 
 // AppName returns the desktop application name through the Wails binding.
 func (a *App) AppName() string {
-	return "Dev Resource Manager"
+	return "OpenEnd"
 }
 
 // GetSystemResourceInfo returns a best-effort snapshot of local system usage.

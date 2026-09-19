@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	processscanner "dev-resource-manager/internal/process"
+	processscanner "openend/internal/process"
 
 	gopsprocess "github.com/shirou/gopsutil/v3/process"
 )

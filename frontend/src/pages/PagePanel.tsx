@@ -2,6 +2,7 @@ import type {PageDefinition} from '../types/navigation';
 import type {LanguageCode, Translator} from '../services/i18n';
 import CleanupPage from './CleanupPage';
 import DashboardPage from './DashboardPage';
+import FeedbackPage from './FeedbackPage';
 import LogsPage from './LogsPage';
 import PortsPage from './PortsPage';
 import ProcessesPage from './ProcessesPage';
@@ -33,6 +34,10 @@ function PagePanel({language, page, t, onLanguageChange}: PagePanelProps) {
 
     if (page.id === 'logs') {
         return <LogsPage page={page} t={t}/>;
+    }
+
+    if (page.id === 'feedback') {
+        return <FeedbackPage page={page} t={t}/>;
     }
 
     if (page.id === 'settings') {

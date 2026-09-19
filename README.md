@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="build/appicon.png" width="128" alt="Dev Resource Manager icon" />
+  <img src="build/appicon.png" width="128" alt="OpenEnd icon" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/SymphonyW/Dev-Resource-Manager/releases"><img alt="Release" src="https://img.shields.io/github/v/release/SymphonyW/Dev-Resource-Manager?style=for-the-badge&label=Release" /></a>
+  <a href="https://github.com/SymphonyW/OpenEnd/releases"><img alt="Release" src="https://img.shields.io/github/v/release/SymphonyW/OpenEnd?style=for-the-badge&label=Release" /></a>
   <img alt="Platform" src="https://img.shields.io/badge/Platform-Windows-0078D4?style=for-the-badge" />
   <img alt="Wails" src="https://img.shields.io/badge/Wails-v2.12.0-DF0000?style=for-the-badge" />
   <img alt="Go" src="https://img.shields.io/badge/Go-1.24+-00ADD8?style=for-the-badge&logo=go&logoColor=white" />
@@ -16,11 +16,11 @@
   English | <a href="README.zh-CN.md">中文</a>
 </p>
 
-# Dev Resource Manager
+# OpenEnd
 
-[Download Windows installer](https://github.com/SymphonyW/Dev-Resource-Manager/releases/latest/download/dev-resource-manager-amd64-installer.exe)
+[Download Windows installer](https://github.com/SymphonyW/OpenEnd/releases/latest/download/openend-amd64-installer.exe)
 
-Dev Resource Manager is a Windows desktop application for developers who need a clear view of local processes, ports, and system resource usage.
+OpenEnd is a Windows desktop application for developers who need a clear view of local processes, ports, and system resource usage.
 
 It is built with Wails, Go, React, TypeScript, and Vite. The project focuses on practical local diagnostics: finding which process owns a port, reviewing resource usage, and safely stopping development-related processes when needed.
 
@@ -43,7 +43,7 @@ Windows builds are published from GitHub Actions as unsigned installers.
 Download the latest release from:
 
 ```text
-https://github.com/SymphonyW/Dev-Resource-Manager/releases
+https://github.com/SymphonyW/OpenEnd/releases
 ```
 
 Current Windows installers are not code signed. Windows SmartScreen or "Unknown publisher" warnings may appear during installation. Only install packages downloaded from the official GitHub Releases page or trusted CI artifacts.

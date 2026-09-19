@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="build/appicon.png" width="128" alt="Dev Resource Manager 图标" />
+  <img src="build/appicon.png" width="128" alt="OpenEnd 图标" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/SymphonyW/Dev-Resource-Manager/releases"><img alt="Release" src="https://img.shields.io/github/v/release/SymphonyW/Dev-Resource-Manager?style=for-the-badge&label=Release" /></a>
+  <a href="https://github.com/SymphonyW/OpenEnd/releases"><img alt="Release" src="https://img.shields.io/github/v/release/SymphonyW/OpenEnd?style=for-the-badge&label=Release" /></a>
   <img alt="Platform" src="https://img.shields.io/badge/Platform-Windows-0078D4?style=for-the-badge" />
   <img alt="Wails" src="https://img.shields.io/badge/Wails-v2.12.0-DF0000?style=for-the-badge" />
   <img alt="Go" src="https://img.shields.io/badge/Go-1.24+-00ADD8?style=for-the-badge&logo=go&logoColor=white" />
@@ -16,11 +16,11 @@
   <a href="README.md">English</a> | 中文
 </p>
 
-# Dev Resource Manager
+# OpenEnd
 
-[Download Windows installer](https://github.com/SymphonyW/Dev-Resource-Manager/releases/latest/download/dev-resource-manager-amd64-installer.exe)
+[Download Windows installer](https://github.com/SymphonyW/OpenEnd/releases/latest/download/openend-amd64-installer.exe)
 
-Dev Resource Manager 是一个面向开发者的 Windows 桌面资源管理工具，用于快速查看本机进程、端口占用和系统资源使用情况。
+OpenEnd 是一个面向开发者的 Windows 桌面资源管理工具，用于快速查看本机进程、端口占用和系统资源使用情况。
 
 项目基于 Wails、Go、React、TypeScript 和 Vite 构建。它不是 Windows 任务管理器的完整替代品，而是聚焦于开发场景中的本地诊断：定位端口被哪个进程占用、查看资源消耗、并在确认后安全结束开发相关进程。
 
@@ -43,7 +43,7 @@ Windows 构建产物通过 GitHub Actions 生成，并以未签名安装包形�
 最新版本下载地址：
 
 ```text
-https://github.com/SymphonyW/Dev-Resource-Manager/releases
+https://github.com/SymphonyW/OpenEnd/releases
 ```
 
 当前 Windows 安装包尚未接入代码签名。安装时 Windows 可能显示 SmartScreen 或“未知发布者”提示。请只从官方 GitHub Releases 页面或可信 CI artifact 下载。

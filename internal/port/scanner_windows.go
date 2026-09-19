@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"dev-resource-manager/internal/config"
-	processscanner "dev-resource-manager/internal/process"
+	"openend/internal/config"
+	processscanner "openend/internal/process"
 
 	gopsnet "github.com/shirou/gopsutil/v3/net"
 	gopsprocess "github.com/shirou/gopsutil/v3/process"

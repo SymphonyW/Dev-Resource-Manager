@@ -6,6 +6,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/windows"
 )
 
 //go:embed all:frontend/dist
@@ -17,7 +18,7 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:     "Dev Resource Manager",
+		Title:     "OpenEnd",
 		Width:     1400,
 		Height:    900,
 		MinWidth:  960,
@@ -26,7 +27,18 @@ func main() {
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 255, G: 255, B: 255, A: 1},
-		OnStartup:        app.startup,
+		Windows: &windows.Options{
+			Theme: windows.Light,
+			CustomTheme: &windows.ThemeSettings{
+				LightModeTitleBar:          windows.RGB(255, 255, 255),
+				LightModeTitleBarInactive:  windows.RGB(255, 255, 255),
+				LightModeTitleText:         windows.RGB(32, 32, 32),
+				LightModeTitleTextInactive: windows.RGB(98, 98, 98),
+				LightModeBorder:            windows.RGB(231, 231, 231),
+				LightModeBorderInactive:    windows.RGB(231, 231, 231),
+			},
+		},
+		OnStartup: app.startup,
 		Bind: []interface{}{
 			app,
 		},

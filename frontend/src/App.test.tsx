@@ -345,12 +345,13 @@ describe('App layout navigation', () => {
         render(<App/>);
 
         expect(screen.queryByText('Desktop')).not.toBeInTheDocument();
-        expect(screen.queryByText('Dev Resource Manager')).not.toBeInTheDocument();
+        expect(screen.getByText('OpenEnd')).toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'Performance'})).toHaveAttribute('aria-current', 'page');
         expect(screen.getByRole('button', {name: 'Processes'})).toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'Ports'})).toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'Cleanup'})).toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'Logs'})).toBeInTheDocument();
+        expect(screen.getByRole('button', {name: 'Feedback'})).toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'Settings'})).toBeInTheDocument();
         expect(await screen.findByLabelText('CPU usage chart')).toBeInTheDocument();
         expect(screen.queryByRole('heading', {name: 'Performance'})).toBeInTheDocument();
@@ -366,6 +367,17 @@ describe('App layout navigation', () => {
         expect(await screen.findByText('node.exe')).toBeInTheDocument();
         expect(screen.queryByRole('heading', {name: 'Ports'})).toBeInTheDocument();
         expect(screen.queryByText('Review local TCP and UDP ports and the owning process.')).not.toBeInTheDocument();
+    });
+
+    it('opens the Feedback page with an email channel', async () => {
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Feedback'}));
+
+        expect(screen.getByRole('button', {name: 'Feedback'})).toHaveAttribute('aria-current', 'page');
+        expect(screen.getByRole('heading', {level: 1, name: 'Feedback'})).toBeInTheDocument();
+        expect(screen.getByText('xinzhanwu1201@gmail.com')).toBeInTheDocument();
+        expect(screen.getByRole('link', {name: 'Email feedback'})).toHaveAttribute('href', expect.stringContaining('mailto:xinzhanwu1201@gmail.com'));
     });
 
     it('shows one compact page title without redundant descriptions', async () => {
@@ -538,7 +550,7 @@ describe('App layout navigation', () => {
         expect(screen.getByLabelText('语言')).toHaveValue('zh');
     });
 
-    it('loads Processes into selectable rows without inline action buttons', async () => {
+    it('loads Processes into selectable rows with a row context menu', async () => {
         render(<App/>);
 
         fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
@@ -555,6 +567,12 @@ describe('App layout navigation', () => {
         expect(within(table).queryByRole('button', {name: 'Details'})).not.toBeInTheDocument();
         expect(within(table).queryByRole('button', {name: 'End Process'})).not.toBeInTheDocument();
         expect(screen.queryByRole('complementary', {name: 'Process detail'})).not.toBeInTheDocument();
+
+        fireEvent.contextMenu(nodeRow as HTMLTableRowElement, {clientX: 80, clientY: 120});
+
+        const menu = screen.getByRole('menu');
+        expect(within(menu).getByRole('menuitem', {name: 'Details'})).toBeInTheDocument();
+        expect(within(menu).getByRole('menuitem', {name: 'End Process'})).toBeInTheDocument();
     });
 
     it('shows process icons with a fallback initial in process name cells', async () => {
@@ -637,6 +655,30 @@ describe('App layout navigation', () => {
 
         const dialog = screen.getByRole('dialog', {name: 'Confirm process termination'});
         expect(within(dialog).getByText('node.exe')).toBeInTheDocument();
+        fireEvent.click(within(dialog).getByRole('button', {name: 'Confirm End Process'}));
+
+        await waitFor(() => expect(killProcessByPIDMock).toHaveBeenCalledWith(100));
+        expect(await screen.findByText('Process node.exe (PID 100) ended.')).toBeInTheDocument();
+    });
+
+    it('confirms before ending a process from the row context menu', async () => {
+        getProcessListMock
+            .mockResolvedValueOnce(processRows)
+            .mockResolvedValueOnce(processRows.filter((process) => process.pid !== 100));
+
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+
+        const nodeRow = screen.getByText('node.exe').closest('tr');
+        expect(nodeRow).not.toBeNull();
+        fireEvent.contextMenu(nodeRow as HTMLTableRowElement, {clientX: 80, clientY: 120});
+        fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', {name: 'End Process'}));
+
+        const dialog = screen.getByRole('dialog', {name: 'Confirm process termination'});
+        expect(within(dialog).getByText('node.exe')).toBeInTheDocument();
+        expect(within(dialog).getByText('C:\\Program Files\\nodejs\\node.exe')).toBeInTheDocument();
         fireEvent.click(within(dialog).getByRole('button', {name: 'Confirm End Process'}));
 
         await waitFor(() => expect(killProcessByPIDMock).toHaveBeenCalledWith(100));

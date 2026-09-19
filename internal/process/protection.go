@@ -3,7 +3,7 @@ package process
 import (
 	"context"
 
-	"dev-resource-manager/internal/config"
+	"openend/internal/config"
 )
 
 // Protector checks whether a process name should be protected from termination.
