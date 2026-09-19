@@ -20,6 +20,8 @@
 
 [Download Windows installer](https://github.com/SymphonyW/OpenEnd/releases/latest/download/openend-amd64-installer.exe)
 
+[Blog post](https://symphonyw.github.io/p/openend/)
+
 OpenEnd is a Windows desktop application for developers who need a clear view of local processes, ports, and system resource usage.
 
 It is built with Wails, Go, React, TypeScript, and Vite. The project focuses on practical local diagnostics: finding which process owns a port, reviewing resource usage, and safely stopping development-related processes when needed.
