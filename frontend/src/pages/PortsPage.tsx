@@ -379,15 +379,6 @@ function PortsPage({page, t}: PortsPageProps) {
                         role="complementary"
                     >
                         <div className="detail-drawer-header">
-                            <button
-                                aria-label={t('common.close')}
-                                className="detail-close-button"
-                                type="button"
-                                onClick={closePortDetail}
-                                disabled={isKilling}
-                            >
-                                <span aria-hidden="true">&times;</span>
-                            </button>
                             <div className="detail-drawer-title">
                                 <p className="detail-drawer-kicker">{t('detail.port.aria')}</p>
                                 <h2>{selectedPort.processName || t('common.unknown')} :{selectedPort.port}</h2>
@@ -400,6 +391,15 @@ function PortsPage({page, t}: PortsPageProps) {
                                     onClick={() => openKillConfirmation(selectedPort)}
                                 >
                                     {t('terminate.occupancy')}
+                                </button>
+                                <button
+                                    aria-label={t('common.close')}
+                                    className="detail-close-button"
+                                    type="button"
+                                    onClick={closePortDetail}
+                                    disabled={isKilling}
+                                >
+                                    <span aria-hidden="true">&times;</span>
                                 </button>
                             </div>
                         </div>

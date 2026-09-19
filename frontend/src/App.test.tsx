@@ -361,7 +361,13 @@ describe('App layout navigation', () => {
         render(<App/>);
 
         expect(screen.queryByText('Desktop')).not.toBeInTheDocument();
-        expect(screen.getByText('OpenEnd')).toBeInTheDocument();
+        const sidebar = screen.getByRole('complementary', {name: 'Primary navigation'});
+        const brandButton = screen.getByRole('button', {name: 'OpenEnd'});
+        expect(brandButton).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.queryByRole('button', {name: 'Toggle navigation'})).not.toBeInTheDocument();
+        fireEvent.click(brandButton);
+        expect(sidebar).toHaveClass('is-collapsed');
+        expect(brandButton).toHaveAttribute('aria-expanded', 'false');
         expect(screen.getByRole('button', {name: 'Performance'})).toHaveAttribute('aria-current', 'page');
         expect(screen.getByRole('button', {name: 'Processes'})).toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'Ports'})).toBeInTheDocument();
@@ -644,7 +650,9 @@ describe('App layout navigation', () => {
         const processDetailHeader = drawer.querySelector('.detail-drawer-header') as HTMLElement;
 
         expect(nodeRow).toHaveAttribute('aria-selected', 'true');
-        expect(within(processDetailHeader).getByRole('button', {name: 'Close'})).toHaveClass('detail-close-button');
+        const processCloseButton = within(processDetailHeader).getByRole('button', {name: 'Close'});
+        expect(processCloseButton).toHaveClass('detail-close-button');
+        expect(processCloseButton.closest('.detail-header-actions')).not.toBeNull();
         await waitFor(() => expect(within(processDetailHeader).getByRole('button', {name: 'End Process'})).not.toBeDisabled());
         expect(within(drawer).getByText('node.exe')).toBeInTheDocument();
         expect(within(drawer).getByText('100')).toBeInTheDocument();
@@ -830,7 +838,9 @@ describe('App layout navigation', () => {
         const detailPanel = screen.getByRole('complementary', {name: 'Port detail'});
         const portDetailHeader = detailPanel.querySelector('.detail-drawer-header') as HTMLElement;
         expect(nodeRow).toHaveAttribute('aria-selected', 'true');
-        expect(within(portDetailHeader).getByRole('button', {name: 'Close'})).toHaveClass('detail-close-button');
+        const portCloseButton = within(portDetailHeader).getByRole('button', {name: 'Close'});
+        expect(portCloseButton).toHaveClass('detail-close-button');
+        expect(portCloseButton.closest('.detail-header-actions')).not.toBeNull();
         expect(within(portDetailHeader).getByRole('button', {name: 'End Occupancy'})).not.toBeDisabled();
         await waitFor(() => expect(getRecentOperationLogsForResourceMock).toHaveBeenCalledWith(100, 'node.exe', [3000]));
         expect(within(detailPanel).getByText('3000')).toBeInTheDocument();
@@ -1007,7 +1017,9 @@ describe('App layout navigation', () => {
         await waitFor(() => expect(getRecentOperationLogsForResourceMock).toHaveBeenCalledWith(100, 'node.exe', [3000]));
         expect(within(detailPanel).getByRole('heading', {name: 'node.exe PID 100'})).toBeInTheDocument();
         const cleanupDetailHeader = detailPanel.querySelector('.detail-drawer-header') as HTMLElement;
-        expect(within(cleanupDetailHeader).getByRole('button', {name: 'Close'})).toHaveClass('detail-close-button');
+        const cleanupCloseButton = within(cleanupDetailHeader).getByRole('button', {name: 'Close'});
+        expect(cleanupCloseButton).toHaveClass('detail-close-button');
+        expect(cleanupCloseButton.closest('.detail-header-actions')).not.toBeNull();
         expect(within(cleanupDetailHeader).getByRole('button', {name: 'End Process'})).not.toBeDisabled();
         expect(detailPanel.querySelector('.detail-actions')).not.toBeInTheDocument();
         expect(within(detailPanel).getByText('100')).toBeInTheDocument();

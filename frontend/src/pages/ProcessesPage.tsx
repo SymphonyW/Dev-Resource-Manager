@@ -381,15 +381,6 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                         role="complementary"
                     >
                         <div className="detail-drawer-header">
-                            <button
-                                aria-label={t('common.close')}
-                                className="detail-close-button"
-                                type="button"
-                                onClick={closeProcessDetail}
-                                disabled={isKilling}
-                            >
-                                <span aria-hidden="true">&times;</span>
-                            </button>
                             <div className="detail-drawer-title">
                                 <p className="detail-drawer-kicker">{t('detail.process.aria')}</p>
                                 <h2>{processDetail?.processName ? `${processDetail.processName} PID ${processDetail.pid}` : t('detail.process.aria')}</h2>
@@ -407,6 +398,15 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                         }}
                                     >
                                         {t('terminate.process')}
+                                    </button>
+                                    <button
+                                        aria-label={t('common.close')}
+                                        className="detail-close-button"
+                                        type="button"
+                                        onClick={closeProcessDetail}
+                                        disabled={isKilling}
+                                    >
+                                        <span aria-hidden="true">&times;</span>
                                     </button>
                                 </div>
                             )}

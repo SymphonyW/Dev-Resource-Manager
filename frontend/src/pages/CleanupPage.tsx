@@ -404,15 +404,6 @@ function CleanupPage({page, t}: CleanupPageProps) {
                         role="complementary"
                     >
                         <div className="detail-drawer-header">
-                            <button
-                                aria-label={t('common.close')}
-                                className="detail-close-button"
-                                type="button"
-                                onClick={closeCleanupDetail}
-                                disabled={isKilling}
-                            >
-                                <span aria-hidden="true">&times;</span>
-                            </button>
                             <div className="detail-drawer-title">
                                 <p className="detail-drawer-kicker">{t('field.pid')} {selectedCandidate.pid}</p>
                                 <h2>{selectedCandidate.name || t('common.unknown')} PID {selectedCandidate.pid}</h2>
@@ -425,6 +416,15 @@ function CleanupPage({page, t}: CleanupPageProps) {
                                     onClick={() => openSingleKillConfirmation(selectedCandidate)}
                                 >
                                     {t('terminate.process')}
+                                </button>
+                                <button
+                                    aria-label={t('common.close')}
+                                    className="detail-close-button"
+                                    type="button"
+                                    onClick={closeCleanupDetail}
+                                    disabled={isKilling}
+                                >
+                                    <span aria-hidden="true">&times;</span>
                                 </button>
                             </div>
                         </div>

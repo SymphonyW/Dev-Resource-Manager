@@ -14,12 +14,15 @@ function Sidebar({activePageId, pages, t, onSelectPage}: SidebarProps) {
     const [collapsed, setCollapsed] = useState(false);
     return (
         <aside className={collapsed ? 'sidebar is-collapsed' : 'sidebar'} aria-label={t('sidebar.navigation')}>
-            <div className="sidebar-brand">
+            <button
+                className="sidebar-brand"
+                type="button"
+                aria-expanded={!collapsed}
+                title={t('sidebar.toggle')}
+                onClick={() => setCollapsed(!collapsed)}
+            >
                 <span className="app-mark"><Icon name="app" size={22}/></span>
                 <span className="brand-label">OpenEnd</span>
-            </div>
-            <button className="nav-toggle" type="button" aria-label={t('sidebar.toggle')} aria-expanded={!collapsed} onClick={() => setCollapsed(!collapsed)}>
-                <Icon name="menu" size={18}/>
             </button>
             <nav className="nav-list">
                 {pages.map((page) => (
