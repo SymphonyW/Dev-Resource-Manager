@@ -199,6 +199,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                 <div className="sort-controls" aria-label={t('filter.search')}>
                     <button
                         aria-label={t('sort.memory')}
+                        aria-pressed={sortKey === 'memory'}
                         className={sortKey === 'memory' ? 'sort-button active' : 'sort-button'}
                         type="button"
                         onClick={() => setSortKey('memory')}
@@ -207,6 +208,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                     </button>
                     <button
                         aria-label={t('sort.cpu')}
+                        aria-pressed={sortKey === 'cpu'}
                         className={sortKey === 'cpu' ? 'sort-button active' : 'sort-button'}
                         type="button"
                         onClick={() => setSortKey('cpu')}
@@ -214,6 +216,9 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                         {t('sort.cpu')}
                     </button>
                 </div>
+                <span className="resource-list-count">
+                    {visibleProcesses.length}{isFiltered && ` / ${processes.length}`} {t('common.items')}
+                </span>
             </div>
 
             {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}
@@ -235,14 +240,14 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                         <table className="process-table process-list-table compact-data-table" aria-label={t('table.processList')}>
                             <thead>
                                 <tr>
-                                    <th>{t('field.pid')}</th>
                                     <th>{t('field.processName')}</th>
-                                    <th>{t('field.path')}</th>
-                                    <th>{t('field.command')}</th>
-                                    <th>{t('field.cpu')}</th>
-                                    <th>{t('field.memory')}</th>
+                                    <th>{t('field.pid')}</th>
+                                    <th className="metric-heading" aria-sort={sortKey === 'cpu' ? 'descending' : undefined}>{t('field.cpu')}</th>
+                                    <th className="metric-heading" aria-sort={sortKey === 'memory' ? 'descending' : undefined}>{t('field.memory')}</th>
                                     <th>{t('field.ports')}</th>
                                     <th>{t('field.protected')}</th>
+                                    <th>{t('field.path')}</th>
+                                    <th>{t('field.command')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -261,7 +266,6 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                             onKeyDown={(event) => handleProcessRowKeyDown(event, process)}
                                             tabIndex={0}
                                         >
-                                            <td className="mono">{process.pid}</td>
                                             <td data-testid="process-name">
                                                 <ProcessNameCell
                                                     iconDataURL={process.iconDataURL}
@@ -269,10 +273,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                                     fallbackName={t('common.unknown')}
                                                 />
                                             </td>
-                                            <td className="muted-cell compact-path-cell" title={path}>{path}</td>
-                                            <td className="muted-cell" title={commandLine}>
-                                                <span className="command-cell" title={commandLine}>{commandLine}</span>
-                                            </td>
+                                            <td className="mono">{process.pid}</td>
                                             <td className="mono metric-cell">{formatPercent(process.cpuPercent)}</td>
                                             <td className="mono metric-cell">
                                                 {formatMemorySize(process.memoryBytes)}
@@ -283,6 +284,10 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                                 <span className={process.isProtected ? 'protected-badge' : 'standard-badge'}>
                                                     {process.isProtected ? t('badge.protected') : t('badge.standard')}
                                                 </span>
+                                            </td>
+                                            <td className="muted-cell compact-path-cell" title={path}>{path}</td>
+                                            <td className="muted-cell" title={commandLine}>
+                                                <span className="command-cell" title={commandLine}>{commandLine}</span>
                                             </td>
                                         </tr>
                                     );
@@ -299,7 +304,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                     >
                         <div className="detail-drawer-header">
                             <div>
-                                <p className="detail-drawer-kicker">{selectedDetailPID !== null ? `${t('field.pid')} ${selectedDetailPID}` : t('detail.process.aria')}</p>
+                                <p className="detail-drawer-kicker">{t('detail.process.aria')}</p>
                                 <h2>{processDetail?.processName ? `${processDetail.processName} PID ${processDetail.pid}` : t('detail.process.aria')}</h2>
                             </div>
                             {selectedDetailPID !== null && (
@@ -341,20 +346,20 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                         <dd>{processDetail.processName || t('common.unknown')}</dd>
                                     </div>
                                     <div>
-                                        <dt>{t('field.executablePath')}</dt>
-                                        <dd>{renderDetailValue(processDetail.executablePath, processDetail.executablePathError, t)}</dd>
-                                    </div>
-                                    <div>
-                                        <dt>{t('field.command')}</dt>
-                                        <dd>{renderDetailValue(processDetail.commandLine, processDetail.commandLineError, t)}</dd>
-                                    </div>
-                                    <div>
                                         <dt>{t('field.cpu')}</dt>
                                         <dd className="mono">{formatPercent(processDetail.cpuPercent)}</dd>
                                     </div>
                                     <div>
                                         <dt>{t('field.memory')}</dt>
                                         <dd className="mono">{formatMemorySize(processDetail.memoryBytes)}</dd>
+                                    </div>
+                                    <div>
+                                        <dt>{t('field.executablePath')}</dt>
+                                        <dd>{renderDetailValue(processDetail.executablePath, processDetail.executablePathError, t)}</dd>
+                                    </div>
+                                    <div>
+                                        <dt>{t('field.command')}</dt>
+                                        <dd>{renderDetailValue(processDetail.commandLine, processDetail.commandLineError, t)}</dd>
                                     </div>
                                 </dl>
 

@@ -224,27 +224,6 @@ function SettingsPage({language, page, t, onLanguageChange}: SettingsPageProps) 
                 </section>
             </div>
 
-            <form className="settings-add-form" onSubmit={handleAddCustomProcess}>
-                <label className="filter-field">
-                    <span>{t('settings.customProcessName')}</span>
-                    <input
-                        aria-label={t('settings.customProcessName')}
-                        value={customName}
-                        onChange={(event) => setCustomName(event.target.value)}
-                        placeholder="node.exe"
-                        disabled={isSaving}
-                    />
-                </label>
-                <button
-                    aria-label={t('settings.addCustom')}
-                    className="primary-action-button"
-                    type="submit"
-                    disabled={isSaving}
-                >
-                    {t('common.add')}
-                </button>
-            </form>
-
             {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}
             {operationMessage && <StatusMessage variant="success">{operationMessage}</StatusMessage>}
             {isLoading && <StatusMessage variant="loading">{t('settings.loading')}</StatusMessage>}
@@ -272,6 +251,26 @@ function SettingsPage({language, page, t, onLanguageChange}: SettingsPageProps) 
                                 <h2 id="custom-protection-title">{t('settings.customProcesses')}</h2>
                                 <span className="settings-count">{settings.customProcessNames.length}</span>
                             </div>
+                            <form className="settings-add-form" onSubmit={handleAddCustomProcess}>
+                                <label className="filter-field">
+                                    <span>{t('settings.customProcessName')}</span>
+                                    <input
+                                        aria-label={t('settings.customProcessName')}
+                                        value={customName}
+                                        onChange={(event) => setCustomName(event.target.value)}
+                                        placeholder="node.exe"
+                                        disabled={isSaving}
+                                    />
+                                </label>
+                                <button
+                                    aria-label={t('settings.addCustom')}
+                                    className="primary-action-button"
+                                    type="submit"
+                                    disabled={isSaving}
+                                >
+                                    {t('common.add')}
+                                </button>
+                            </form>
                             {settings.customProcessNames.length === 0 ? (
                                 <StatusMessage variant="empty">{t('settings.customEmpty')}</StatusMessage>
                             ) : (
