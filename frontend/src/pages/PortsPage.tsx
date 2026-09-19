@@ -1,5 +1,5 @@
-import {useCallback, useMemo, useState} from 'react';
-import type {KeyboardEvent} from 'react';
+import {useCallback, useEffect, useMemo, useState} from 'react';
+import type {KeyboardEvent, MouseEvent} from 'react';
 import ProcessNameCell from '../components/ProcessNameCell';
 import ScrollableDataTable from '../components/ScrollableDataTable';
 import StatusMessage from '../components/StatusMessage';
@@ -21,6 +21,12 @@ interface PortsPageProps {
     t: Translator;
 }
 
+interface PortContextMenu {
+    port: PortInfo;
+    x: number;
+    y: number;
+}
+
 function PortsPage({page, t}: PortsPageProps) {
     const [ports, setPorts] = useState<PortInfo[]>([]);
     const [processes, setProcesses] = useState<ProcessInfo[]>([]);
@@ -36,6 +42,7 @@ function PortsPage({page, t}: PortsPageProps) {
     const [selectedPort, setSelectedPort] = useState<PortInfo | null>(null);
     const [operationLogs, setOperationLogs] = useState<OperationLog[]>([]);
     const [logsErrorMessage, setLogsErrorMessage] = useState('');
+    const [contextMenu, setContextMenu] = useState<PortContextMenu | null>(null);
 
     const loadPorts = useCallback(async (showLoading = true) => {
         if (showLoading) {
@@ -80,6 +87,7 @@ function PortsPage({page, t}: PortsPageProps) {
 
     const openPortDetail = (port: PortInfo) => {
         setOperationMessage('');
+        setContextMenu(null);
         setSelectedPort(port);
         void loadRelatedLogs(port);
     };
@@ -91,7 +99,12 @@ function PortsPage({page, t}: PortsPageProps) {
     };
 
     const openKillConfirmation = (port: PortInfo) => {
+        if (port.isProtected) {
+            return;
+        }
+
         setOperationMessage('');
+        setContextMenu(null);
         setPortToKill(port);
     };
 
@@ -137,6 +150,38 @@ function PortsPage({page, t}: PortsPageProps) {
         event.preventDefault();
         openPortDetail(port);
     };
+
+    const handlePortRowContextMenu = (event: MouseEvent<HTMLTableRowElement>, port: PortInfo) => {
+        event.preventDefault();
+        setOperationMessage('');
+        setContextMenu({
+            port,
+            x: event.clientX,
+            y: event.clientY,
+        });
+    };
+
+    useEffect(() => {
+        if (!contextMenu) {
+            return undefined;
+        }
+
+        const closeContextMenu = () => setContextMenu(null);
+        const closeContextMenuOnEscape = (event: globalThis.KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                closeContextMenu();
+            }
+        };
+
+        window.addEventListener('click', closeContextMenu);
+        window.addEventListener('contextmenu', closeContextMenu);
+        window.addEventListener('keydown', closeContextMenuOnEscape);
+        return () => {
+            window.removeEventListener('click', closeContextMenu);
+            window.removeEventListener('contextmenu', closeContextMenu);
+            window.removeEventListener('keydown', closeContextMenuOnEscape);
+        };
+    }, [contextMenu]);
 
     const statusOptions = useMemo(() => {
         return Array.from(new Set(ports.map((port) => port.status).filter(Boolean))).sort();
@@ -259,7 +304,8 @@ function PortsPage({page, t}: PortsPageProps) {
                             <tbody>
                                 {visiblePorts.map((port) => {
                                     const isDevPort = isCommonDevelopmentPort(port.port);
-                                    const isSelected = selectedPort ? samePort(selectedPort, port) : false;
+                                    const isSelected = (selectedPort ? samePort(selectedPort, port) : false)
+                                        || (contextMenu ? samePort(contextMenu.port, port) : false);
                                     const owner = processesByPID.get(port.pid);
                                     const processName = owner?.name || port.processName || t('common.unknown');
                                     const processPath = owner?.path || port.processPath || t('common.unavailable');
@@ -272,6 +318,7 @@ function PortsPage({page, t}: PortsPageProps) {
                                             aria-selected={isSelected}
                                             className={portRowClassName(port, isSelected)}
                                             onClick={() => openPortDetail(port)}
+                                            onContextMenu={(event) => handlePortRowContextMenu(event, port)}
                                             onKeyDown={(event) => handlePortRowKeyDown(event, port)}
                                             tabIndex={0}
                                         >
@@ -320,15 +367,25 @@ function PortsPage({page, t}: PortsPageProps) {
                                 <p className="detail-drawer-kicker">{t('detail.port.aria')}</p>
                                 <h2>{selectedPort.processName || t('common.unknown')} :{selectedPort.port}</h2>
                             </div>
-                            <button
-                                aria-label={t('common.close')}
-                                className="dialog-close-button"
-                                type="button"
-                                onClick={closePortDetail}
-                                disabled={isKilling}
-                            >
-                                {t('common.close')}
-                            </button>
+                            <div className="detail-header-actions">
+                                <button
+                                    className="danger-button"
+                                    type="button"
+                                    disabled={selectedPort.isProtected || isKilling}
+                                    onClick={() => openKillConfirmation(selectedPort)}
+                                >
+                                    {t('terminate.occupancy')}
+                                </button>
+                                <button
+                                    aria-label={t('common.close')}
+                                    className="dialog-close-button"
+                                    type="button"
+                                    onClick={closePortDetail}
+                                    disabled={isKilling}
+                                >
+                                    {t('common.close')}
+                                </button>
+                            </div>
                         </div>
 
                         <div className="detail-drawer-body">
@@ -385,20 +442,36 @@ function PortsPage({page, t}: PortsPageProps) {
                                 logsErrorMessage={logsErrorMessage}
                                 t={t}
                             />
-
-                            <div className="detail-actions">
-                                <button
-                                    className="danger-button"
-                                    type="button"
-                                    disabled={selectedPort.isProtected || isKilling}
-                                    onClick={() => openKillConfirmation(selectedPort)}
-                                >
-                                    {t('terminate.occupancy')}
-                                </button>
-                            </div>
                         </div>
                     </aside>
                     )}
+                </div>
+            )}
+
+            {contextMenu && (
+                <div
+                    className="process-context-menu"
+                    role="menu"
+                    style={{left: contextMenu.x, top: contextMenu.y}}
+                    aria-label={t('table.portList')}
+                    onContextMenu={(event) => event.preventDefault()}
+                >
+                    <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => openPortDetail(contextMenu.port)}
+                    >
+                        {t('processes.details')}
+                    </button>
+                    <button
+                        className="danger-menu-item"
+                        type="button"
+                        role="menuitem"
+                        disabled={contextMenu.port.isProtected || isKilling}
+                        onClick={() => openKillConfirmation(contextMenu.port)}
+                    >
+                        {t('terminate.occupancy')}
+                    </button>
                 </div>
             )}
 

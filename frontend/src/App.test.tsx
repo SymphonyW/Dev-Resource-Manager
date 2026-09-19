@@ -813,7 +813,13 @@ describe('App layout navigation', () => {
         expect(within(table).queryByRole('button', {name: 'End Occupancy'})).not.toBeInTheDocument();
         expect(screen.queryByRole('complementary', {name: 'Port detail'})).not.toBeInTheDocument();
 
-        fireEvent.click(nodeRow as HTMLTableRowElement);
+        fireEvent.contextMenu(nodeRow as HTMLTableRowElement, {clientX: 80, clientY: 120});
+        const menu = screen.getByRole('menu');
+        expect(within(menu).getByRole('menuitem', {name: 'Details'})).toBeInTheDocument();
+        expect(within(menu).getByRole('menuitem', {name: 'End Occupancy'})).toBeInTheDocument();
+        fireEvent.click(within(menu).getByRole('menuitem', {name: 'Details'}));
+
+        await waitFor(() => expect(screen.getByRole('complementary', {name: 'Port detail'})).toBeInTheDocument());
 
         const detailPanel = screen.getByRole('complementary', {name: 'Port detail'});
         expect(nodeRow).toHaveAttribute('aria-selected', 'true');
@@ -865,6 +871,30 @@ describe('App layout navigation', () => {
         expect(await screen.findByText('Process node.exe (PID 100) ended for TCP port 3000.')).toBeInTheDocument();
         expect(screen.queryByRole('dialog', {name: 'Confirm port occupancy termination'})).not.toBeInTheDocument();
         await waitFor(() => expect(getPortListMock).toHaveBeenCalledTimes(2));
+    });
+
+    it('confirms before ending a port occupant from the row context menu', async () => {
+        getPortListMock
+            .mockResolvedValueOnce(portRows)
+            .mockResolvedValueOnce(portRows.filter((port) => port.port !== 3000));
+
+        render(<App/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
+        expect(await screen.findByText('node.exe')).toBeInTheDocument();
+
+        const nodeRow = screen.getByText('node.exe').closest('tr');
+        expect(nodeRow).not.toBeNull();
+        fireEvent.contextMenu(nodeRow as HTMLTableRowElement, {clientX: 80, clientY: 120});
+        fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', {name: 'End Occupancy'}));
+
+        const dialog = screen.getByRole('dialog', {name: 'Confirm port occupancy termination'});
+        expect(within(dialog).getByText('3000')).toBeInTheDocument();
+        expect(within(dialog).getByText('node.exe')).toBeInTheDocument();
+        fireEvent.click(within(dialog).getByRole('button', {name: 'Confirm End Occupancy'}));
+
+        await waitFor(() => expect(killProcessByPortMock).toHaveBeenCalledWith(3000, 'TCP'));
+        expect(await screen.findByText('Process node.exe (PID 100) ended for TCP port 3000.')).toBeInTheDocument();
     });
 
     it('filters Ports by port number and process name', async () => {
