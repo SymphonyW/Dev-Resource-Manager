@@ -12,3 +12,8 @@ import (
 func List(ctx context.Context) ([]Info, error) {
 	return nil, fmt.Errorf("process scanning is not supported on %s", runtime.GOOS)
 }
+
+// ListWithProtector is implemented only for Windows because this app currently targets Windows process management.
+func ListWithProtector(ctx context.Context, protector Protector) ([]Info, error) {
+	return nil, fmt.Errorf("process scanning is not supported on %s", runtime.GOOS)
+}

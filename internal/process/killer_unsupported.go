@@ -16,3 +16,12 @@ func KillByPID(ctx context.Context, pid int) OperationResult {
 		PID:     pid,
 	}
 }
+
+// KillByPIDWithProtector is implemented only for Windows because this app currently targets Windows process management.
+func KillByPIDWithProtector(ctx context.Context, pid int, protector Protector) OperationResult {
+	return OperationResult{
+		Success: false,
+		Message: fmt.Sprintf("process termination is not supported on %s", runtime.GOOS),
+		PID:     pid,
+	}
+}

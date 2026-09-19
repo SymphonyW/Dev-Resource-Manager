@@ -3,6 +3,10 @@ export interface SystemResourceInfo {
     totalMemoryBytes: number;
     usedMemoryBytes: number;
     freeMemoryBytes: number;
+    gpuPercent: number;
+    totalVRAMBytes: number;
+    usedVRAMBytes: number;
+    freeVRAMBytes: number;
     processCount: number;
     portCount: number;
 }

@@ -17,19 +17,30 @@ type portKillOperations interface {
 	killProcessByPID(ctx context.Context, pid int) processscanner.OperationResult
 }
 
-type gopsutilPortKillOperations struct{}
+type gopsutilPortKillOperations struct {
+	protector processscanner.Protector
+}
 
 func (gopsutilPortKillOperations) connectionsWithContext(ctx context.Context, protocol string) ([]gopsnet.ConnectionStat, error) {
 	return gopsnet.ConnectionsWithContext(ctx, protocol)
 }
 
-func (gopsutilPortKillOperations) killProcessByPID(ctx context.Context, pid int) processscanner.OperationResult {
+func (ops gopsutilPortKillOperations) killProcessByPID(ctx context.Context, pid int) processscanner.OperationResult {
+	if ops.protector != nil {
+		return processscanner.KillByPIDWithProtector(ctx, pid, ops.protector)
+	}
+
 	return processscanner.KillByPID(ctx, pid)
 }
 
 // KillProcessByPort resolves the current port owner PID and ends that process if it is allowed.
 func KillProcessByPort(ctx context.Context, port int, protocol string) processscanner.OperationResult {
 	return killProcessByPort(ctx, port, protocol, gopsutilPortKillOperations{})
+}
+
+// KillProcessByPortWithProtector resolves a port owner and ends it using supplied protection rules.
+func KillProcessByPortWithProtector(ctx context.Context, port int, protocol string, protector processscanner.Protector) processscanner.OperationResult {
+	return killProcessByPort(ctx, port, protocol, gopsutilPortKillOperations{protector: protector})
 }
 
 func killProcessByPort(ctx context.Context, port int, protocol string, ops portKillOperations) processscanner.OperationResult {

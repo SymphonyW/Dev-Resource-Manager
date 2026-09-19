@@ -2,11 +2,16 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"math"
-	"time"
+	"strings"
+	"sync"
 
+	"dev-resource-manager/internal/config"
+	processdetail "dev-resource-manager/internal/detail"
 	portscanner "dev-resource-manager/internal/port"
 	processscanner "dev-resource-manager/internal/process"
+	"dev-resource-manager/internal/resource"
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
@@ -20,6 +25,10 @@ type SystemResourceInfo struct {
 	TotalMemoryBytes uint64  `json:"totalMemoryBytes"`
 	UsedMemoryBytes  uint64  `json:"usedMemoryBytes"`
 	FreeMemoryBytes  uint64  `json:"freeMemoryBytes"`
+	GPUPercent       float64 `json:"gpuPercent"`
+	TotalVRAMBytes   uint64  `json:"totalVRAMBytes"`
+	UsedVRAMBytes    uint64  `json:"usedVRAMBytes"`
+	FreeVRAMBytes    uint64  `json:"freeVRAMBytes"`
 	ProcessCount     int     `json:"processCount"`
 	PortCount        int     `json:"portCount"`
 }
@@ -47,61 +56,158 @@ func (a *App) AppName() string {
 
 // GetSystemResourceInfo returns a best-effort snapshot of local system usage.
 func (a *App) GetSystemResourceInfo() SystemResourceInfo {
-	info := SystemResourceInfo{}
-
-	if percentages, err := cpu.Percent(200*time.Millisecond, false); err == nil && len(percentages) > 0 {
-		info.CPUPercent = roundOneDecimal(percentages[0])
-	} else {
-		// TODO: surface CPU collection errors to the frontend diagnostics panel.
-		info.CPUPercent = 0
-	}
-
-	if memory, err := mem.VirtualMemory(); err == nil {
-		info.TotalMemoryBytes = memory.Total
-		info.UsedMemoryBytes = memory.Used
-		info.FreeMemoryBytes = memory.Available
-	} else {
-		// TODO: surface memory collection errors to the frontend diagnostics panel.
-		info.TotalMemoryBytes = 0
-		info.UsedMemoryBytes = 0
-		info.FreeMemoryBytes = 0
-	}
-
-	if pids, err := gopsprocess.Pids(); err == nil {
-		info.ProcessCount = len(pids)
-	} else {
-		// TODO: surface process collection permission errors to the frontend diagnostics panel.
-		info.ProcessCount = 0
-	}
-
-	if connections, err := net.Connections("inet"); err == nil {
-		ports := make(map[uint32]struct{})
-		for _, connection := range connections {
-			if connection.Laddr.Port > 0 {
-				ports[connection.Laddr.Port] = struct{}{}
-			}
-		}
-		info.PortCount = len(ports)
-	} else {
-		// TODO: surface port collection permission errors to the frontend diagnostics panel.
-		info.PortCount = 0
-	}
-
-	return info
+	return collectSystemResourceInfo(defaultSystemResourceCollectors())
 }
 
 func roundOneDecimal(value float64) float64 {
 	return math.Round(value*10) / 10
 }
 
-// GetProcessList returns the current Windows process list for the frontend.
-func (a *App) GetProcessList() ([]processscanner.Info, error) {
-	ctx := a.ctx
-	if ctx == nil {
-		ctx = context.Background()
+type memoryResourceInfo struct {
+	TotalBytes uint64
+	UsedBytes  uint64
+	FreeBytes  uint64
+}
+
+type systemResourceCollectors struct {
+	CPUPercent   func() float64
+	Memory       func() memoryResourceInfo
+	GPU          func() resource.GPUInfo
+	ProcessCount func() int
+	PortCount    func() int
+}
+
+func defaultSystemResourceCollectors() systemResourceCollectors {
+	return systemResourceCollectors{
+		CPUPercent:   collectCPUPercent,
+		Memory:       collectMemoryResourceInfo,
+		GPU:          resource.GetGPUInfo,
+		ProcessCount: collectProcessCount,
+		PortCount:    collectPortCount,
+	}
+}
+
+func collectSystemResourceInfo(collectors systemResourceCollectors) SystemResourceInfo {
+	var cpuPercent float64
+	var memoryInfo memoryResourceInfo
+	var gpuInfo resource.GPUInfo
+	var processCount int
+	var portCount int
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(5)
+
+	go func() {
+		defer waitGroup.Done()
+		if collectors.CPUPercent != nil {
+			cpuPercent = collectors.CPUPercent()
+		}
+	}()
+
+	go func() {
+		defer waitGroup.Done()
+		if collectors.Memory == nil {
+			return
+		}
+		memoryInfo = collectors.Memory()
+	}()
+
+	go func() {
+		defer waitGroup.Done()
+		if collectors.GPU == nil {
+			return
+		}
+		gpuInfo = collectors.GPU()
+	}()
+
+	go func() {
+		defer waitGroup.Done()
+		if collectors.ProcessCount != nil {
+			processCount = collectors.ProcessCount()
+		}
+	}()
+
+	go func() {
+		defer waitGroup.Done()
+		if collectors.PortCount != nil {
+			portCount = collectors.PortCount()
+		}
+	}()
+
+	waitGroup.Wait()
+	return SystemResourceInfo{
+		CPUPercent:       cpuPercent,
+		TotalMemoryBytes: memoryInfo.TotalBytes,
+		UsedMemoryBytes:  memoryInfo.UsedBytes,
+		FreeMemoryBytes:  memoryInfo.FreeBytes,
+		GPUPercent:       gpuInfo.GPUPercent,
+		TotalVRAMBytes:   gpuInfo.TotalVRAMBytes,
+		UsedVRAMBytes:    gpuInfo.UsedVRAMBytes,
+		FreeVRAMBytes:    gpuInfo.FreeVRAMBytes,
+		ProcessCount:     processCount,
+		PortCount:        portCount,
+	}
+}
+
+func collectCPUPercent() float64 {
+	percentages, err := cpu.Percent(0, false)
+	if err != nil || len(percentages) == 0 {
+		// TODO: surface CPU collection errors to the frontend diagnostics panel.
+		return 0
 	}
 
-	processes, err := processscanner.List(ctx)
+	return roundOneDecimal(percentages[0])
+}
+
+func collectMemoryResourceInfo() memoryResourceInfo {
+	memory, err := mem.VirtualMemory()
+	if err != nil {
+		// TODO: surface memory collection errors to the frontend diagnostics panel.
+		return memoryResourceInfo{}
+	}
+
+	return memoryResourceInfo{
+		TotalBytes: memory.Total,
+		UsedBytes:  memory.Used,
+		FreeBytes:  memory.Available,
+	}
+}
+
+func collectProcessCount() int {
+	pids, err := gopsprocess.Pids()
+	if err != nil {
+		// TODO: surface process collection permission errors to the frontend diagnostics panel.
+		return 0
+	}
+
+	return len(pids)
+}
+
+func collectPortCount() int {
+	connections, err := net.Connections("inet")
+	if err != nil {
+		// TODO: surface port collection permission errors to the frontend diagnostics panel.
+		return 0
+	}
+
+	ports := make(map[uint32]struct{})
+	for _, connection := range connections {
+		if connection.Laddr.Port > 0 {
+			ports[connection.Laddr.Port] = struct{}{}
+		}
+	}
+
+	return len(ports)
+}
+
+// GetProcessList returns the current Windows process list for the frontend.
+func (a *App) GetProcessList() ([]processscanner.Info, error) {
+	ctx := a.appContext()
+	rules, err := a.loadProtectionRules(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	processes, err := processscanner.ListWithProtector(ctx, rules)
 	if err != nil {
 		return nil, err
 	}
@@ -109,14 +215,34 @@ func (a *App) GetProcessList() ([]processscanner.Info, error) {
 	return processes, nil
 }
 
-// GetPortList returns the current Windows TCP/UDP port occupancy list for the frontend.
-func (a *App) GetPortList() ([]portscanner.Info, error) {
-	ctx := a.ctx
-	if ctx == nil {
-		ctx = context.Background()
+// GetProcessDetail returns a single process detail view with ports and recent logs.
+func (a *App) GetProcessDetail(pid int) (processdetail.ProcessDetail, error) {
+	ctx := a.appContext()
+	rules, err := a.loadProtectionRules(ctx)
+	if err != nil {
+		return processdetail.ProcessDetail{}, err
 	}
 
-	ports, err := portscanner.List(ctx)
+	snapshot, err := processdetail.ReadProcessSnapshot(ctx, int32(pid), rules)
+	if err != nil {
+		return processdetail.ProcessDetail{}, err
+	}
+
+	ports, portsError := a.processDetailPorts(ctx, rules)
+	logs, logsError := a.processDetailLogs(ctx, pid, snapshot.ProcessName)
+
+	return processdetail.BuildProcessDetail(snapshot, ports, logs, portsError, logsError), nil
+}
+
+// GetPortList returns the current Windows TCP/UDP port occupancy list for the frontend.
+func (a *App) GetPortList() ([]portscanner.Info, error) {
+	ctx := a.appContext()
+	rules, err := a.loadProtectionRules(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	ports, err := portscanner.ListWithProtector(ctx, rules)
 	if err != nil {
 		return nil, err
 	}
@@ -124,22 +250,224 @@ func (a *App) GetPortList() ([]portscanner.Info, error) {
 	return ports, nil
 }
 
-// KillProcessByPID ends a non-protected process by PID and returns an operation result.
-func (a *App) KillProcessByPID(pid int) processscanner.OperationResult {
-	ctx := a.ctx
-	if ctx == nil {
-		ctx = context.Background()
+func (a *App) processDetailPorts(ctx context.Context, rules config.ProtectionRules) ([]portscanner.Info, string) {
+	ports, err := portscanner.ListWithProtector(ctx, rules)
+	if err != nil {
+		return nil, "Unable to load occupied ports for this process: " + err.Error()
 	}
 
-	return processscanner.KillByPID(ctx, pid)
+	return ports, ""
+}
+
+func (a *App) processDetailLogs(ctx context.Context, pid int, processName string) ([]config.OperationLog, string) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return nil, "Unable to open operation log store: " + err.Error()
+	}
+	defer store.Close()
+
+	logs, err := store.GetRecentOperationLogsForProcess(ctx, pid, processName, processdetail.RecentLogLimit())
+	if err != nil {
+		return nil, "Unable to load recent operation logs: " + err.Error()
+	}
+
+	return logs, ""
+}
+
+// KillProcessByPID ends a non-protected process by PID and returns an operation result.
+func (a *App) KillProcessByPID(pid int) processscanner.OperationResult {
+	ctx := a.appContext()
+	rules, err := a.loadProtectionRules(ctx)
+	if err != nil {
+		result := processscanner.OperationResult{
+			Success: false,
+			Message: "Unable to load process protection rules before ending process: " + err.Error(),
+			PID:     pid,
+		}
+		return a.recordOperationLog(ctx, "kill_process_by_pid", 0, result)
+	}
+
+	result := processscanner.KillByPIDWithProtector(ctx, pid, rules)
+	return a.recordOperationLog(ctx, "kill_process_by_pid", 0, result)
 }
 
 // KillProcessByPort resolves a port owner and ends the owning process if it is allowed.
 func (a *App) KillProcessByPort(port int, protocol string) processscanner.OperationResult {
-	ctx := a.ctx
-	if ctx == nil {
-		ctx = context.Background()
+	ctx := a.appContext()
+	rules, err := a.loadProtectionRules(ctx)
+	if err != nil {
+		result := processscanner.OperationResult{
+			Success: false,
+			Message: "Unable to load process protection rules before ending port occupancy: " + err.Error(),
+		}
+		return a.recordOperationLog(ctx, "kill_process_by_port", port, result)
 	}
 
-	return portscanner.KillProcessByPort(ctx, port, protocol)
+	result := portscanner.KillProcessByPortWithProtector(ctx, port, protocol, rules)
+	return a.recordOperationLog(ctx, "kill_process_by_port", port, result)
+}
+
+// GetProtectionSettings returns the built-in and user-managed protected process names.
+func (a *App) GetProtectionSettings() (config.ProtectionSettings, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return config.ProtectionSettings{}, err
+	}
+	defer store.Close()
+
+	return store.GetProtectionSettings(a.appContext())
+}
+
+// AddCustomProtectedProcessName adds a user-managed protected process name.
+func (a *App) AddCustomProtectedProcessName(name string) (config.ProtectionSettings, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return config.ProtectionSettings{}, err
+	}
+	defer store.Close()
+
+	return store.AddCustomProtectedProcessName(a.appContext(), name)
+}
+
+// DeleteCustomProtectedProcessName removes a user-managed protected process name.
+func (a *App) DeleteCustomProtectedProcessName(name string) (config.ProtectionSettings, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return config.ProtectionSettings{}, err
+	}
+	defer store.Close()
+
+	return store.DeleteCustomProtectedProcessName(a.appContext(), name)
+}
+
+// GetCleanupRules returns built-in and user-managed cleanup matching rules.
+func (a *App) GetCleanupRules() ([]config.CleanupRule, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return nil, err
+	}
+	defer store.Close()
+
+	return store.GetCleanupRules(a.appContext())
+}
+
+// AddCleanupRule adds a user-managed cleanup matching rule.
+func (a *App) AddCleanupRule(input config.CleanupRuleInput) ([]config.CleanupRule, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return nil, err
+	}
+	defer store.Close()
+
+	return store.AddCleanupRule(a.appContext(), input)
+}
+
+// SetCleanupRuleEnabled enables or disables a cleanup matching rule.
+func (a *App) SetCleanupRuleEnabled(id string, enabled bool) ([]config.CleanupRule, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return nil, err
+	}
+	defer store.Close()
+
+	return store.SetCleanupRuleEnabled(a.appContext(), id, enabled)
+}
+
+// DeleteCleanupRule removes a user-managed cleanup matching rule.
+func (a *App) DeleteCleanupRule(id string) ([]config.CleanupRule, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return nil, err
+	}
+	defer store.Close()
+
+	return store.DeleteCleanupRule(a.appContext(), id)
+}
+
+// GetOperationLogs returns persisted process operation logs ordered newest first.
+func (a *App) GetOperationLogs() ([]config.OperationLog, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return nil, err
+	}
+	defer store.Close()
+
+	return store.GetOperationLogs(a.appContext())
+}
+
+// GetRecentOperationLogsForResource returns bounded logs related to one detail target.
+func (a *App) GetRecentOperationLogsForResource(pid int, processName string, ports []int) ([]config.OperationLog, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return nil, err
+	}
+	defer store.Close()
+
+	return store.GetRecentOperationLogsForResource(a.appContext(), pid, processName, ports, processdetail.RecentLogLimit())
+}
+
+func (a *App) appContext() context.Context {
+	if a.ctx == nil {
+		return context.Background()
+	}
+
+	return a.ctx
+}
+
+func (a *App) loadProtectionRules(ctx context.Context) (config.ProtectionRules, error) {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return config.ProtectionRules{}, err
+	}
+	defer store.Close()
+
+	rules, err := store.LoadProtectionRules(ctx)
+	if err != nil {
+		return config.ProtectionRules{}, err
+	}
+
+	return rules, nil
+}
+
+func (a *App) recordOperationLog(ctx context.Context, action string, port int, result processscanner.OperationResult) processscanner.OperationResult {
+	store, err := config.NewDefaultStore()
+	if err != nil {
+		return appendOperationLogError(result, err)
+	}
+	defer store.Close()
+
+	logResult := "failure"
+	if result.Success {
+		logResult = "success"
+	}
+
+	err = store.AddOperationLog(ctx, config.OperationLogInput{
+		Action:      action,
+		PID:         result.PID,
+		ProcessName: result.ProcessName,
+		Port:        port,
+		Result:      logResult,
+		Message:     result.Message,
+	})
+	if err != nil {
+		return appendOperationLogError(result, err)
+	}
+
+	return result
+}
+
+func appendOperationLogError(result processscanner.OperationResult, err error) processscanner.OperationResult {
+	if err == nil {
+		return result
+	}
+
+	baseMessage := strings.TrimSpace(result.Message)
+	logMessage := fmt.Sprintf("Operation log write failed: %v", err)
+	if baseMessage == "" {
+		result.Message = logMessage
+		return result
+	}
+
+	result.Message = baseMessage + " " + logMessage
+	return result
 }

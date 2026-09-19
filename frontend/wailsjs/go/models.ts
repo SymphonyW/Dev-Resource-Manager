@@ -1,23 +1,253 @@
-export namespace main {
+export namespace config {
+	
+	export class CleanupPortRange {
+	    start: number;
+	    end: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CleanupPortRange(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.start = source["start"];
+	        this.end = source["end"];
+	    }
+	}
+	export class CleanupRule {
+	    id: string;
+	    name: string;
+	    enabled: boolean;
+	    isBuiltin: boolean;
+	    matchProcessNames: string[];
+	    matchCommandKeywords: string[];
+	    matchPorts: number[];
+	    matchPortRanges: CleanupPortRange[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CleanupRule(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.enabled = source["enabled"];
+	        this.isBuiltin = source["isBuiltin"];
+	        this.matchProcessNames = source["matchProcessNames"];
+	        this.matchCommandKeywords = source["matchCommandKeywords"];
+	        this.matchPorts = source["matchPorts"];
+	        this.matchPortRanges = this.convertValues(source["matchPortRanges"], CleanupPortRange);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CleanupRuleInput {
+	    name: string;
+	    enabled: boolean;
+	    matchProcessNames: string[];
+	    matchCommandKeywords: string[];
+	    matchPorts: number[];
+	    matchPortRanges: CleanupPortRange[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CleanupRuleInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.enabled = source["enabled"];
+	        this.matchProcessNames = source["matchProcessNames"];
+	        this.matchCommandKeywords = source["matchCommandKeywords"];
+	        this.matchPorts = source["matchPorts"];
+	        this.matchPortRanges = this.convertValues(source["matchPortRanges"], CleanupPortRange);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class OperationLog {
+	    id: number;
+	    action: string;
+	    pid: number;
+	    processName: string;
+	    port: number;
+	    result: string;
+	    message: string;
+	    createdAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new OperationLog(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.action = source["action"];
+	        this.pid = source["pid"];
+	        this.processName = source["processName"];
+	        this.port = source["port"];
+	        this.result = source["result"];
+	        this.message = source["message"];
+	        this.createdAt = source["createdAt"];
+	    }
+	}
+	export class ProtectionSettings {
+	    defaultProcessNames: string[];
+	    customProcessNames: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ProtectionSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.defaultProcessNames = source["defaultProcessNames"];
+	        this.customProcessNames = source["customProcessNames"];
+	    }
+	}
 
+}
+
+export namespace detail {
+	
+	export class ProcessPort {
+	    port: number;
+	    protocol: string;
+	    status: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProcessPort(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.port = source["port"];
+	        this.protocol = source["protocol"];
+	        this.status = source["status"];
+	    }
+	}
+	export class ProcessDetail {
+	    pid: number;
+	    processName: string;
+	    iconDataURL: string;
+	    executablePath: string;
+	    executablePathError: string;
+	    commandLine: string;
+	    commandLineError: string;
+	    cpuPercent: number;
+	    memoryBytes: number;
+	    isProtected: boolean;
+	    isDeveloperRelated: boolean;
+	    ports: ProcessPort[];
+	    portsError: string;
+	    recentLogs: config.OperationLog[];
+	    logsError: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProcessDetail(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.pid = source["pid"];
+	        this.processName = source["processName"];
+	        this.iconDataURL = source["iconDataURL"];
+	        this.executablePath = source["executablePath"];
+	        this.executablePathError = source["executablePathError"];
+	        this.commandLine = source["commandLine"];
+	        this.commandLineError = source["commandLineError"];
+	        this.cpuPercent = source["cpuPercent"];
+	        this.memoryBytes = source["memoryBytes"];
+	        this.isProtected = source["isProtected"];
+	        this.isDeveloperRelated = source["isDeveloperRelated"];
+	        this.ports = this.convertValues(source["ports"], ProcessPort);
+	        this.portsError = source["portsError"];
+	        this.recentLogs = this.convertValues(source["recentLogs"], config.OperationLog);
+	        this.logsError = source["logsError"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
+export namespace main {
+	
 	export class SystemResourceInfo {
 	    cpuPercent: number;
 	    totalMemoryBytes: number;
 	    usedMemoryBytes: number;
 	    freeMemoryBytes: number;
+	    gpuPercent: number;
+	    totalVRAMBytes: number;
+	    usedVRAMBytes: number;
+	    freeVRAMBytes: number;
 	    processCount: number;
 	    portCount: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SystemResourceInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.cpuPercent = source["cpuPercent"];
 	        this.totalMemoryBytes = source["totalMemoryBytes"];
 	        this.usedMemoryBytes = source["usedMemoryBytes"];
 	        this.freeMemoryBytes = source["freeMemoryBytes"];
+	        this.gpuPercent = source["gpuPercent"];
+	        this.totalVRAMBytes = source["totalVRAMBytes"];
+	        this.usedVRAMBytes = source["usedVRAMBytes"];
+	        this.freeVRAMBytes = source["freeVRAMBytes"];
 	        this.processCount = source["processCount"];
 	        this.portCount = source["portCount"];
 	    }
@@ -26,7 +256,7 @@ export namespace main {
 }
 
 export namespace port {
-
+	
 	export class Info {
 	    port: number;
 	    protocol: string;
@@ -35,11 +265,11 @@ export namespace port {
 	    processName: string;
 	    processPath: string;
 	    isProtected: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Info(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.port = source["port"];
@@ -55,25 +285,27 @@ export namespace port {
 }
 
 export namespace process {
-
+	
 	export class Info {
 	    pid: number;
 	    name: string;
+	    iconDataURL: string;
 	    path: string;
 	    commandLine: string;
 	    user: string;
 	    cpuPercent: number;
 	    memoryBytes: number;
 	    isProtected: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Info(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.pid = source["pid"];
 	        this.name = source["name"];
+	        this.iconDataURL = source["iconDataURL"];
 	        this.path = source["path"];
 	        this.commandLine = source["commandLine"];
 	        this.user = source["user"];
@@ -87,11 +319,11 @@ export namespace process {
 	    message: string;
 	    pid: number;
 	    processName: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new OperationResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
@@ -102,3 +334,4 @@ export namespace process {
 	}
 
 }
+

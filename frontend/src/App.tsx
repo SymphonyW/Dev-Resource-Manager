@@ -1,38 +1,74 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import './App.css';
 import Sidebar from './components/Sidebar';
 import PagePanel from './pages/PagePanel';
-import {defaultPageId, getPageById, pages} from './services/pages';
+import {
+    createTranslator,
+    languageStorageKey,
+    resolveInitialLanguage,
+    type LanguageCode,
+} from './services/i18n';
+import {defaultPageId, getPageById, getPages} from './services/pages';
 import type {PageId} from './types/navigation';
 import {AppName} from '../wailsjs/go/main/App';
 
+type BridgeStatus = 'connecting' | 'connected' | 'unavailable';
+
 function App() {
-    const [appName, setAppName] = useState('Dev Resource Manager');
-    const [bridgeStatus, setBridgeStatus] = useState('Connecting');
+    const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus>('connecting');
     const [activePageId, setActivePageId] = useState<PageId>(defaultPageId);
+    const [language, setLanguage] = useState<LanguageCode>(() => resolveInitialLanguage());
+
+    const t = useMemo(() => createTranslator(language), [language]);
+    const pages = useMemo(() => getPages(t), [t]);
 
     useEffect(() => {
-        AppName()
-            .then((name) => {
-                setAppName(name);
-                setBridgeStatus('Connected');
+        Promise.resolve().then(() => AppName())
+            .then(() => {
+                setBridgeStatus('connected');
             })
-            .catch(() => setBridgeStatus('Unavailable'));
+            .catch(() => setBridgeStatus('unavailable'));
     }, []);
 
-    const activePage = getPageById(activePageId);
+    useEffect(() => {
+        document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en';
+    }, [language]);
+
+    const activePage = getPageById(activePageId, pages);
+    const bridgeStatusLabel = bridgeStatus === 'connected'
+        ? t('bridge.connected')
+        : bridgeStatus === 'unavailable'
+            ? t('bridge.unavailable')
+            : t('bridge.connecting');
+
+    const handleLanguageChange = (nextLanguage: LanguageCode) => {
+        setLanguage(nextLanguage);
+        window.localStorage.setItem(languageStorageKey, nextLanguage);
+    };
 
     return (
         <div className="app-shell">
             <Sidebar
-                appName={appName}
                 activePageId={activePageId}
-                bridgeStatus={bridgeStatus}
+                bridgeStatus={bridgeStatusLabel}
+                isConnected={bridgeStatus === 'connected'}
                 pages={pages}
+                t={t}
                 onSelectPage={setActivePageId}
             />
             <main className="main-content">
-                <PagePanel page={activePage}/>
+                <header className="workspace-header">
+                    <h1>{activePage.label}</h1>
+                    <span className="workspace-context">{t('app.localComputer')}</span>
+                </header>
+                <div className="workspace-body" key={activePageId}>
+                    <PagePanel
+                        language={language}
+                        page={activePage}
+                        t={t}
+                        onLanguageChange={handleLanguageChange}
+                    />
+                </div>
             </main>
         </div>
     );

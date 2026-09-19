@@ -1,33 +1,56 @@
 import type {PageDefinition} from '../types/navigation';
+import type {LanguageCode, Translator} from '../services/i18n';
+import CleanupPage from './CleanupPage';
 import DashboardPage from './DashboardPage';
+import LogsPage from './LogsPage';
 import PortsPage from './PortsPage';
 import ProcessesPage from './ProcessesPage';
+import SettingsPage from './SettingsPage';
 
 interface PagePanelProps {
+    language: LanguageCode;
     page: PageDefinition;
+    t: Translator;
+    onLanguageChange: (language: LanguageCode) => void;
 }
 
-function PagePanel({page}: PagePanelProps) {
+function PagePanel({language, page, t, onLanguageChange}: PagePanelProps) {
     if (page.id === 'dashboard') {
-        return <DashboardPage page={page}/>;
+        return <DashboardPage page={page} t={t}/>;
     }
 
     if (page.id === 'processes') {
-        return <ProcessesPage page={page}/>;
+        return <ProcessesPage page={page} t={t}/>;
     }
 
     if (page.id === 'ports') {
-        return <PortsPage page={page}/>;
+        return <PortsPage page={page} t={t}/>;
+    }
+
+    if (page.id === 'cleanup') {
+        return <CleanupPage page={page} t={t}/>;
+    }
+
+    if (page.id === 'logs') {
+        return <LogsPage page={page} t={t}/>;
+    }
+
+    if (page.id === 'settings') {
+        return (
+            <SettingsPage
+                language={language}
+                page={page}
+                t={t}
+                onLanguageChange={onLanguageChange}
+            />
+        );
     }
 
     return (
-        <section className="page-panel" aria-labelledby={`${page.id}-title`}>
-            <p className="eyebrow">Dev Resource Manager</p>
-            <h1 id={`${page.id}-title`}>{page.title}</h1>
-            <p className="page-description">{page.description}</p>
+        <section className="page-panel" aria-label={t('page.unsupported.title')}>
             <div className="page-empty-state">
-                <span>Ready for implementation</span>
-                <p>Backend data and actions will be connected in later feature steps.</p>
+                <span>{t('page.unsupported.status')}</span>
+                <p>{t('page.unsupported.description')}</p>
             </div>
         </section>
     );
