@@ -256,6 +256,33 @@ const nodeProcessDetail = {
     logsError: '',
 };
 
+const baseSystemResourceInfo = {
+    cpuPercent: 42.5,
+    cpuName: 'Intel(R) Core(TM) i9-14900HX',
+    cpuPhysicalCores: 24,
+    cpuLogicalProcessors: 32,
+    cpuMaxMHz: 2200,
+    totalMemoryBytes: 16 * 1024 * 1024 * 1024,
+    usedMemoryBytes: 9.5 * 1024 * 1024 * 1024,
+    freeMemoryBytes: 6.5 * 1024 * 1024 * 1024,
+    gpuPercent: 18.2,
+    gpuNames: ['NVIDIA GeForce RTX 4070 Laptop GPU'],
+    totalVRAMBytes: 8 * 1024 * 1024 * 1024,
+    usedVRAMBytes: 3 * 1024 * 1024 * 1024,
+    freeVRAMBytes: 5 * 1024 * 1024 * 1024,
+    processCount: 184,
+    threadCount: 22656,
+    portCount: 37,
+    uptimeSeconds: 57_600,
+};
+
+function makeSystemResourceInfo(overrides: Partial<typeof baseSystemResourceInfo> = {}) {
+    return {
+        ...baseSystemResourceInfo,
+        ...overrides,
+    };
+}
+
 describe('App layout navigation', () => {
     afterEach(() => {
         vi.useRealTimers();
@@ -265,18 +292,7 @@ describe('App layout navigation', () => {
     beforeEach(() => {
         window.localStorage.clear();
         getSystemResourceInfoMock.mockReset();
-        getSystemResourceInfoMock.mockResolvedValue({
-            cpuPercent: 42.5,
-            totalMemoryBytes: 16 * 1024 * 1024 * 1024,
-            usedMemoryBytes: 9.5 * 1024 * 1024 * 1024,
-            freeMemoryBytes: 6.5 * 1024 * 1024 * 1024,
-            gpuPercent: 18.2,
-            totalVRAMBytes: 8 * 1024 * 1024 * 1024,
-            usedVRAMBytes: 3 * 1024 * 1024 * 1024,
-            freeVRAMBytes: 5 * 1024 * 1024 * 1024,
-            processCount: 184,
-            portCount: 37,
-        });
+        getSystemResourceInfoMock.mockResolvedValue(makeSystemResourceInfo());
         getProcessListMock.mockReset();
         getProcessListMock.mockResolvedValue(processRows);
         getProcessDetailMock.mockReset();
@@ -402,36 +418,37 @@ describe('App layout navigation', () => {
     it('loads Dashboard resource metrics and refreshes them automatically', async () => {
         vi.useFakeTimers();
         getSystemResourceInfoMock
-            .mockResolvedValueOnce({
+            .mockResolvedValueOnce(makeSystemResourceInfo({
                 cpuPercent: 42.5,
-                totalMemoryBytes: 16 * 1024 * 1024 * 1024,
                 usedMemoryBytes: 9.5 * 1024 * 1024 * 1024,
                 freeMemoryBytes: 6.5 * 1024 * 1024 * 1024,
                 gpuPercent: 18.2,
-                totalVRAMBytes: 8 * 1024 * 1024 * 1024,
                 usedVRAMBytes: 3 * 1024 * 1024 * 1024,
                 freeVRAMBytes: 5 * 1024 * 1024 * 1024,
                 processCount: 184,
+                threadCount: 22656,
                 portCount: 37,
-            })
-            .mockResolvedValueOnce({
+            }))
+            .mockResolvedValueOnce(makeSystemResourceInfo({
                 cpuPercent: 25,
-                totalMemoryBytes: 16 * 1024 * 1024 * 1024,
                 usedMemoryBytes: 8 * 1024 * 1024 * 1024,
                 freeMemoryBytes: 7.5 * 1024 * 1024 * 1024,
                 gpuPercent: 28.4,
-                totalVRAMBytes: 8 * 1024 * 1024 * 1024,
                 usedVRAMBytes: 4 * 1024 * 1024 * 1024,
                 freeVRAMBytes: 4 * 1024 * 1024 * 1024,
                 processCount: 190,
+                threadCount: 23000,
                 portCount: 42,
-            });
+            }));
 
         render(<App/>);
 
         await act(async () => {});
 
         expect(screen.getAllByText('42.5%').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Intel(R) Core(TM) i9-14900HX').length).toBeGreaterThan(0);
+        expect(screen.getByText('2.20 GHz')).toBeInTheDocument();
+        expect(screen.getByText('32')).toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'Memory'})).toHaveTextContent('59.4%');
         expect(screen.queryByText('Total Memory')).not.toBeInTheDocument();
         expect(screen.queryByText('Used Memory')).not.toBeInTheDocument();
@@ -440,8 +457,9 @@ describe('App layout navigation', () => {
         expect(screen.getByText('VRAM')).toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'VRAM'})).toHaveTextContent('37.5%');
         expect(screen.getByText('184')).toBeInTheDocument();
+        expect(screen.getByText('22,656')).toBeInTheDocument();
         expect(screen.getByText('37')).toBeInTheDocument();
-        expect(screen.getAllByText('Updates every 3 seconds').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Intel(R) Core(TM) i9-14900HX').length).toBeGreaterThan(0);
 
         expect(screen.queryByRole('button', {name: 'Refresh'})).not.toBeInTheDocument();
 
@@ -461,36 +479,33 @@ describe('App layout navigation', () => {
         expect(screen.getByRole('button', {name: 'Memory'})).toHaveTextContent('50.0%');
         expect(screen.getByRole('button', {name: 'VRAM'})).toHaveTextContent('50.0%');
         expect(screen.getByText('190')).toBeInTheDocument();
+        expect(screen.getByText('23,000')).toBeInTheDocument();
         expect(screen.getByText('42')).toBeInTheDocument();
     });
 
     it('renders Dashboard resource charts and updates them on an interval', async () => {
         vi.useFakeTimers();
         getSystemResourceInfoMock
-            .mockResolvedValueOnce({
+            .mockResolvedValueOnce(makeSystemResourceInfo({
                 cpuPercent: 42.5,
-                totalMemoryBytes: 16 * 1024 * 1024 * 1024,
                 usedMemoryBytes: 9.5 * 1024 * 1024 * 1024,
                 freeMemoryBytes: 6.5 * 1024 * 1024 * 1024,
                 gpuPercent: 18.2,
-                totalVRAMBytes: 8 * 1024 * 1024 * 1024,
                 usedVRAMBytes: 3 * 1024 * 1024 * 1024,
                 freeVRAMBytes: 5 * 1024 * 1024 * 1024,
                 processCount: 184,
                 portCount: 37,
-            })
-            .mockResolvedValueOnce({
+            }))
+            .mockResolvedValueOnce(makeSystemResourceInfo({
                 cpuPercent: 25,
-                totalMemoryBytes: 16 * 1024 * 1024 * 1024,
                 usedMemoryBytes: 8 * 1024 * 1024 * 1024,
                 freeMemoryBytes: 8 * 1024 * 1024 * 1024,
                 gpuPercent: 28.4,
-                totalVRAMBytes: 8 * 1024 * 1024 * 1024,
                 usedVRAMBytes: 4 * 1024 * 1024 * 1024,
                 freeVRAMBytes: 4 * 1024 * 1024 * 1024,
                 processCount: 190,
                 portCount: 42,
-            });
+            }));
 
         render(<App/>);
 
@@ -522,6 +537,7 @@ describe('App layout navigation', () => {
         expect(screen.getByRole('button', {name: 'Memory'})).toHaveAttribute('aria-pressed', 'true');
         fireEvent.click(screen.getByRole('button', {name: 'GPU'}));
         expect(screen.getByLabelText('GPU usage chart')).toBeInTheDocument();
+        expect(screen.getAllByText('NVIDIA GeForce RTX 4070 Laptop GPU').length).toBeGreaterThan(0);
         fireEvent.click(screen.getByRole('button', {name: 'VRAM'}));
         expect(screen.getByLabelText('VRAM usage chart')).toBeInTheDocument();
     });

@@ -17,6 +17,11 @@ interface Props { page: PageDefinition; t: Translator; }
 const percent = (value: number) => Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
 const ratio = (used: number, total: number) => total > 0 ? percent(used / total * 100) : 0;
 
+interface Metric {
+    label: string;
+    value: string;
+}
+
 function graphPoints(history: Sample[], key: ResourceKey) {
     const end = history[history.length - 1]?.time ?? 0;
     return history.map(sample => ({
@@ -62,21 +67,8 @@ function DashboardPage({page, t}: Props) {
     ];
     const active = resources.find(resource => resource.key === selected)!;
     const latest = history[history.length - 1];
-    const memorySelected = selected === 'memory';
-    const capacitySelected = memorySelected || selected === 'vram';
-    const subtitle = info && capacitySelected
-        ? formatMemorySize(memorySelected ? info.totalMemoryBytes : info.totalVRAMBytes)
-        : t('dashboard.autoRefresh');
-    const metrics = info ? [
-        {label: t('dashboard.metric.usage'), value: formatPercent(latest?.[selected] ?? 0)},
-        ...(capacitySelected ? [
-            {label: t(memorySelected ? 'dashboard.metric.usedMemory' : 'dashboard.metric.usedVRAM'), value: formatMemorySize(memorySelected ? info.usedMemoryBytes : info.usedVRAMBytes)},
-            {label: t(memorySelected ? 'dashboard.metric.freeMemory' : 'dashboard.metric.freeVRAM'), value: formatMemorySize(memorySelected ? info.freeMemoryBytes : info.freeVRAMBytes)},
-            {label: t(memorySelected ? 'dashboard.metric.totalMemory' : 'dashboard.metric.totalVRAM'), value: subtitle},
-        ] : []),
-        {label: t('dashboard.metric.processes'), value: String(info.processCount)},
-        {label: t('dashboard.metric.occupiedPorts'), value: String(info.portCount)},
-    ] : [];
+    const subtitle = info ? resourceSubtitle(info, selected, t) : t('dashboard.autoRefresh');
+    const metrics = info ? buildMetrics(info, selected, latest?.[selected] ?? 0, t) : [];
 
     return (
         <section className="page-panel dashboard-page" aria-label={page.title}>
@@ -96,6 +88,7 @@ function DashboardPage({page, t}: Props) {
                                 <span className="resource-select-text">
                                     <span className="resource-select-title">{resource.title}</span>
                                     <span className="resource-select-value">{formatPercent(latest?.[resource.key] ?? 0)}</span>
+                                    <span className="resource-select-meta">{resourceSubtitle(info, resource.key, t)}</span>
                                 </span>
                             </button>
                         );
@@ -115,6 +108,116 @@ function DashboardPage({page, t}: Props) {
             </div>}
         </section>
     );
+}
+
+function resourceSubtitle(info: SystemResourceInfo | null, key: ResourceKey, t: Translator): string {
+    if (!info) {
+        return t('dashboard.autoRefresh');
+    }
+
+    if (key === 'cpu') {
+        return info.cpuName || t('common.unavailable');
+    }
+    if (key === 'memory') {
+        return formatMemorySize(info.totalMemoryBytes);
+    }
+    if (key === 'gpu') {
+        return formatList(info.gpuNames, t);
+    }
+
+    return info.totalVRAMBytes > 0 ? formatMemorySize(info.totalVRAMBytes) : t('common.unavailable');
+}
+
+function buildMetrics(info: SystemResourceInfo, key: ResourceKey, usage: number, t: Translator): Metric[] {
+    const commonSystemMetrics = [
+        {label: t('dashboard.metric.processes'), value: formatWholeNumber(info.processCount)},
+        {label: t('dashboard.metric.threads'), value: formatWholeNumber(info.threadCount)},
+        {label: t('dashboard.metric.occupiedPorts'), value: formatWholeNumber(info.portCount)},
+        {label: t('dashboard.metric.uptime'), value: formatUptime(info.uptimeSeconds, t)},
+    ];
+
+    if (key === 'cpu') {
+        return [
+            {label: t('dashboard.metric.usage'), value: formatPercent(usage)},
+            {label: t('dashboard.metric.baseSpeed'), value: formatFrequencyMHz(info.cpuMaxMHz, t)},
+            {label: t('dashboard.metric.physicalCores'), value: formatWholeNumber(info.cpuPhysicalCores)},
+            {label: t('dashboard.metric.logicalProcessors'), value: formatWholeNumber(info.cpuLogicalProcessors)},
+            ...commonSystemMetrics,
+        ];
+    }
+
+    if (key === 'memory') {
+        return [
+            {label: t('dashboard.metric.usage'), value: formatPercent(usage)},
+            {label: t('dashboard.metric.usedMemory'), value: formatMemorySize(info.usedMemoryBytes)},
+            {label: t('dashboard.metric.freeMemory'), value: formatMemorySize(info.freeMemoryBytes)},
+            {label: t('dashboard.metric.totalMemory'), value: formatMemorySize(info.totalMemoryBytes)},
+            ...commonSystemMetrics.slice(0, 2),
+        ];
+    }
+
+    if (key === 'gpu') {
+        return [
+            {label: t('dashboard.metric.usage'), value: formatPercent(usage)},
+            {label: t('dashboard.metric.gpuModel'), value: formatList(info.gpuNames, t)},
+            {label: t('dashboard.metric.usedVRAM'), value: formatMemorySize(info.usedVRAMBytes)},
+            {label: t('dashboard.metric.totalVRAM'), value: info.totalVRAMBytes > 0 ? formatMemorySize(info.totalVRAMBytes) : t('common.unavailable')},
+        ];
+    }
+
+    return [
+        {label: t('dashboard.metric.usage'), value: formatPercent(usage)},
+        {label: t('dashboard.metric.usedVRAM'), value: formatMemorySize(info.usedVRAMBytes)},
+        {label: t('dashboard.metric.freeVRAM'), value: formatMemorySize(info.freeVRAMBytes)},
+        {label: t('dashboard.metric.totalVRAM'), value: info.totalVRAMBytes > 0 ? formatMemorySize(info.totalVRAMBytes) : t('common.unavailable')},
+        {label: t('dashboard.metric.gpuModel'), value: formatList(info.gpuNames, t)},
+    ];
+}
+
+function formatList(values: string[], t: Translator): string {
+    const normalized = values.map(value => value.trim()).filter(Boolean);
+    return normalized.length > 0 ? normalized.join(', ') : t('common.unavailable');
+}
+
+function formatFrequencyMHz(value: number, t: Translator): string {
+    if (!Number.isFinite(value) || value <= 0) {
+        return t('common.unavailable');
+    }
+
+    if (value >= 1000) {
+        return `${(value / 1000).toFixed(2)} GHz`;
+    }
+
+    return `${Math.round(value)} MHz`;
+}
+
+function formatWholeNumber(value: number): string {
+    if (!Number.isFinite(value) || value <= 0) {
+        return '0';
+    }
+
+    return Math.round(value).toLocaleString();
+}
+
+function formatUptime(totalSeconds: number, t: Translator): string {
+    if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
+        return t('common.unavailable');
+    }
+
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor(totalSeconds % 86400 / 3600);
+    const minutes = Math.floor(totalSeconds % 3600 / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+
+    if (days > 0) {
+        return `${days}:${padTime(hours)}:${padTime(minutes)}:${padTime(seconds)}`;
+    }
+
+    return `${hours}:${padTime(minutes)}:${padTime(seconds)}`;
+}
+
+function padTime(value: number): string {
+    return value.toString().padStart(2, '0');
 }
 
 function ResourceGraph({history, resourceKey, title, ariaLabel, t}: {

@@ -27,13 +27,22 @@ func GetGPUInfo() GPUInfo {
 		memoryCounters = nil
 	}
 
+	controllers, err := queryGPUControllers()
+	if err != nil {
+		controllers = nil
+	}
+	names := make([]string, 0, len(controllers))
+	for _, controller := range controllers {
+		names = append(names, controller.Name)
+	}
+
 	totalVRAMBytes, err := defaultTotalVRAMReader.Read()
 	if err != nil {
 		// TODO: expose a precise driver-level VRAM total when neither registry nor WMI can provide it.
 		totalVRAMBytes = 0
 	}
 
-	return buildGPUInfo(engineCounters, memoryCounters, totalVRAMBytes)
+	return buildGPUInfo(engineCounters, memoryCounters, names, totalVRAMBytes)
 }
 
 func queryGPUEngineCounters() ([]gpuEngineCounter, error) {
@@ -100,19 +109,24 @@ func readTotalVRAMBytesFromRegistry() uint64 {
 	return totalVRAMBytes
 }
 
-type videoController struct {
-	AdapterRAM *uint64
-}
-
-func readTotalVRAMBytesFromWMI() (uint64, error) {
-	var controllers []videoController
+func queryGPUControllers() ([]gpuController, error) {
+	var controllers []gpuController
 	err := wmi.QueryNamespace(
-		"SELECT AdapterRAM FROM Win32_VideoController",
+		"SELECT Name, AdapterRAM FROM Win32_VideoController",
 		&controllers,
 		"ROOT\\CIMV2",
 	)
 	if err != nil {
-		return 0, fmt.Errorf("query video controller VRAM total: %w", err)
+		return nil, fmt.Errorf("query video controllers: %w", err)
+	}
+
+	return controllers, nil
+}
+
+func readTotalVRAMBytesFromWMI() (uint64, error) {
+	controllers, err := queryGPUControllers()
+	if err != nil {
+		return 0, err
 	}
 
 	var totalVRAMBytes uint64

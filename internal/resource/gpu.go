@@ -2,12 +2,14 @@ package resource
 
 import (
 	"math"
+	"strings"
 	"sync"
 )
 
 // GPUInfo is a best-effort snapshot of GPU engine and dedicated VRAM usage.
 type GPUInfo struct {
 	GPUPercent     float64
+	Names          []string
 	TotalVRAMBytes uint64
 	UsedVRAMBytes  uint64
 	FreeVRAMBytes  uint64
@@ -23,6 +25,11 @@ type gpuMemoryCounter struct {
 	DedicatedUsage uint64
 	SharedUsage    uint64
 	TotalCommitted uint64
+}
+
+type gpuController struct {
+	Name       string
+	AdapterRAM *uint64
 }
 
 type totalVRAMReadFunc func() (uint64, error)
@@ -62,7 +69,7 @@ func (reader *cachedTotalVRAMReader) Read() (uint64, error) {
 	return totalVRAMBytes, nil
 }
 
-func buildGPUInfo(engineCounters []gpuEngineCounter, memoryCounters []gpuMemoryCounter, totalVRAMBytes uint64) GPUInfo {
+func buildGPUInfo(engineCounters []gpuEngineCounter, memoryCounters []gpuMemoryCounter, names []string, totalVRAMBytes uint64) GPUInfo {
 	var gpuPercent float64
 	for _, counter := range engineCounters {
 		gpuPercent += float64(counter.UtilizationPercentage)
@@ -80,10 +87,30 @@ func buildGPUInfo(engineCounters []gpuEngineCounter, memoryCounters []gpuMemoryC
 
 	return GPUInfo{
 		GPUPercent:     roundOneDecimal(clampPercent(gpuPercent)),
+		Names:          uniqueNonEmptyStrings(names),
 		TotalVRAMBytes: totalVRAMBytes,
 		UsedVRAMBytes:  usedVRAMBytes,
 		FreeVRAMBytes:  freeVRAMBytes,
 	}
+}
+
+func uniqueNonEmptyStrings(values []string) []string {
+	seen := make(map[string]struct{})
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+
+	return result
 }
 
 func roundOneDecimal(value float64) float64 {
