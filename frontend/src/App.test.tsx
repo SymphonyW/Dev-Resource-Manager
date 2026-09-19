@@ -392,7 +392,10 @@ describe('App layout navigation', () => {
 
         expect(screen.getByRole('button', {name: 'Feedback'})).toHaveAttribute('aria-current', 'page');
         expect(screen.getByRole('heading', {level: 1, name: 'Feedback'})).toBeInTheDocument();
+        expect(screen.getAllByRole('heading', {name: 'Feedback'})).toHaveLength(1);
         expect(screen.getByText('xinzhanwu1201@gmail.com')).toBeInTheDocument();
+        expect(screen.getByText('Email template')).toBeInTheDocument();
+        expect(screen.getByText(/Related process or port:/)).toBeInTheDocument();
         expect(screen.getByRole('link', {name: 'Email feedback'})).toHaveAttribute('href', expect.stringContaining('mailto:xinzhanwu1201@gmail.com'));
     });
 
@@ -587,7 +590,7 @@ describe('App layout navigation', () => {
         expect(within(table).queryByRole('button', {name: 'End Process'})).not.toBeInTheDocument();
         expect(screen.queryByRole('complementary', {name: 'Process detail'})).not.toBeInTheDocument();
 
-        fireEvent.contextMenu(nodeRow as HTMLTableRowElement, {clientX: 80, clientY: 120});
+        fireEvent.mouseDown(nodeRow as HTMLTableRowElement, {button: 2, clientX: 80, clientY: 120});
 
         const menu = screen.getByRole('menu');
         expect(within(menu).getByRole('menuitem', {name: 'Details'})).toBeInTheDocument();
@@ -638,8 +641,11 @@ describe('App layout navigation', () => {
 
         await waitFor(() => expect(getProcessDetailMock).toHaveBeenCalledWith(100));
         const drawer = await screen.findByRole('complementary', {name: 'Process detail'});
+        const processDetailHeader = drawer.querySelector('.detail-drawer-header') as HTMLElement;
 
         expect(nodeRow).toHaveAttribute('aria-selected', 'true');
+        expect(within(processDetailHeader).getByRole('button', {name: 'Close'})).toHaveClass('detail-close-button');
+        await waitFor(() => expect(within(processDetailHeader).getByRole('button', {name: 'End Process'})).not.toBeDisabled());
         expect(within(drawer).getByText('node.exe')).toBeInTheDocument();
         expect(within(drawer).getByText('100')).toBeInTheDocument();
         expect(within(drawer).getByText('Unable to read executable path. Try running as administrator.')).toBeInTheDocument();
@@ -692,7 +698,7 @@ describe('App layout navigation', () => {
 
         const nodeRow = screen.getByText('node.exe').closest('tr');
         expect(nodeRow).not.toBeNull();
-        fireEvent.contextMenu(nodeRow as HTMLTableRowElement, {clientX: 80, clientY: 120});
+        fireEvent.mouseDown(nodeRow as HTMLTableRowElement, {button: 2, clientX: 80, clientY: 120});
         fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', {name: 'End Process'}));
 
         const dialog = screen.getByRole('dialog', {name: 'Confirm process termination'});
@@ -813,7 +819,7 @@ describe('App layout navigation', () => {
         expect(within(table).queryByRole('button', {name: 'End Occupancy'})).not.toBeInTheDocument();
         expect(screen.queryByRole('complementary', {name: 'Port detail'})).not.toBeInTheDocument();
 
-        fireEvent.contextMenu(nodeRow as HTMLTableRowElement, {clientX: 80, clientY: 120});
+        fireEvent.mouseDown(nodeRow as HTMLTableRowElement, {button: 2, clientX: 80, clientY: 120});
         const menu = screen.getByRole('menu');
         expect(within(menu).getByRole('menuitem', {name: 'Details'})).toBeInTheDocument();
         expect(within(menu).getByRole('menuitem', {name: 'End Occupancy'})).toBeInTheDocument();
@@ -822,7 +828,10 @@ describe('App layout navigation', () => {
         await waitFor(() => expect(screen.getByRole('complementary', {name: 'Port detail'})).toBeInTheDocument());
 
         const detailPanel = screen.getByRole('complementary', {name: 'Port detail'});
+        const portDetailHeader = detailPanel.querySelector('.detail-drawer-header') as HTMLElement;
         expect(nodeRow).toHaveAttribute('aria-selected', 'true');
+        expect(within(portDetailHeader).getByRole('button', {name: 'Close'})).toHaveClass('detail-close-button');
+        expect(within(portDetailHeader).getByRole('button', {name: 'End Occupancy'})).not.toBeDisabled();
         await waitFor(() => expect(getRecentOperationLogsForResourceMock).toHaveBeenCalledWith(100, 'node.exe', [3000]));
         expect(within(detailPanel).getByText('3000')).toBeInTheDocument();
         expect(within(detailPanel).getByText('TCP')).toBeInTheDocument();
@@ -885,7 +894,7 @@ describe('App layout navigation', () => {
 
         const nodeRow = screen.getByText('node.exe').closest('tr');
         expect(nodeRow).not.toBeNull();
-        fireEvent.contextMenu(nodeRow as HTMLTableRowElement, {clientX: 80, clientY: 120});
+        fireEvent.mouseDown(nodeRow as HTMLTableRowElement, {button: 2, clientX: 80, clientY: 120});
         fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', {name: 'End Occupancy'}));
 
         const dialog = screen.getByRole('dialog', {name: 'Confirm port occupancy termination'});
@@ -997,6 +1006,10 @@ describe('App layout navigation', () => {
         expect(nodeRow).toHaveAttribute('aria-selected', 'true');
         await waitFor(() => expect(getRecentOperationLogsForResourceMock).toHaveBeenCalledWith(100, 'node.exe', [3000]));
         expect(within(detailPanel).getByRole('heading', {name: 'node.exe PID 100'})).toBeInTheDocument();
+        const cleanupDetailHeader = detailPanel.querySelector('.detail-drawer-header') as HTMLElement;
+        expect(within(cleanupDetailHeader).getByRole('button', {name: 'Close'})).toHaveClass('detail-close-button');
+        expect(within(cleanupDetailHeader).getByRole('button', {name: 'End Process'})).not.toBeDisabled();
+        expect(detailPanel.querySelector('.detail-actions')).not.toBeInTheDocument();
         expect(within(detailPanel).getByText('100')).toBeInTheDocument();
         expect(within(detailPanel).getByText('C:\\Program Files\\nodejs\\node.exe')).toBeInTheDocument();
         expect(within(detailPanel).getByText('node server.js')).toBeInTheDocument();

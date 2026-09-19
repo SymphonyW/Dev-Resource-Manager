@@ -15,7 +15,6 @@ function FeedbackPage({page, t}: FeedbackPageProps) {
             <div className="feedback-content">
                 <div className="feedback-primary">
                     <span className="feedback-eyebrow">{page.eyebrow}</span>
-                    <h2>{page.title}</h2>
                     <p>{page.description}</p>
                     <a className="primary-action-button feedback-mail-button" href={mailtoHref}>
                         {t('feedback.mailAction')}
@@ -36,6 +35,12 @@ function FeedbackPage({page, t}: FeedbackPageProps) {
                     <div>
                         <dt>{t('field.reason')}</dt>
                         <dd>{t('feedback.bodyHint')}</dd>
+                    </div>
+                    <div className="feedback-template-row">
+                        <dt>{t('feedback.templateTitle')}</dt>
+                        <dd>
+                            <pre className="feedback-template">{t('feedback.mailBody')}</pre>
+                        </dd>
                     </div>
                 </dl>
             </div>

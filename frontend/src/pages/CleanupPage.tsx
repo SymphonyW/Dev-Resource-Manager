@@ -404,19 +404,29 @@ function CleanupPage({page, t}: CleanupPageProps) {
                         role="complementary"
                     >
                         <div className="detail-drawer-header">
-                            <div>
-                                <p className="detail-drawer-kicker">{t('field.pid')} {selectedCandidate.pid}</p>
-                                <h2>{selectedCandidate.name || t('common.unknown')} PID {selectedCandidate.pid}</h2>
-                            </div>
                             <button
                                 aria-label={t('common.close')}
-                                className="dialog-close-button"
+                                className="detail-close-button"
                                 type="button"
                                 onClick={closeCleanupDetail}
                                 disabled={isKilling}
                             >
-                                {t('common.close')}
+                                <span aria-hidden="true">&times;</span>
                             </button>
+                            <div className="detail-drawer-title">
+                                <p className="detail-drawer-kicker">{t('field.pid')} {selectedCandidate.pid}</p>
+                                <h2>{selectedCandidate.name || t('common.unknown')} PID {selectedCandidate.pid}</h2>
+                            </div>
+                            <div className="detail-header-actions">
+                                <button
+                                    className="danger-button"
+                                    type="button"
+                                    disabled={selectedCandidate.isProtected || isKilling}
+                                    onClick={() => openSingleKillConfirmation(selectedCandidate)}
+                                >
+                                    {t('terminate.process')}
+                                </button>
+                            </div>
                         </div>
 
                         <div className="detail-drawer-body">
@@ -482,17 +492,6 @@ function CleanupPage({page, t}: CleanupPageProps) {
                                 logsErrorMessage={logsErrorMessage}
                                 t={t}
                             />
-
-                            <div className="detail-actions">
-                                <button
-                                    className="danger-button"
-                                    type="button"
-                                    disabled={selectedCandidate.isProtected || isKilling}
-                                    onClick={() => openSingleKillConfirmation(selectedCandidate)}
-                                >
-                                    {t('terminate.process')}
-                                </button>
-                            </div>
                         </div>
                     </aside>
                     )}

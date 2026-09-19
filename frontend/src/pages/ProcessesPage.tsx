@@ -150,14 +150,29 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
         openProcessDetail(process);
     };
 
-    const handleProcessRowContextMenu = (event: MouseEvent<HTMLTableRowElement>, process: ProcessInfo) => {
-        event.preventDefault();
+    const openProcessContextMenu = (process: ProcessInfo, x: number, y: number) => {
         setOperationMessage('');
         setContextMenu({
             process,
-            x: event.clientX,
-            y: event.clientY,
+            x,
+            y,
         });
+    };
+
+    const handleProcessRowMouseDown = (event: MouseEvent<HTMLTableRowElement>, process: ProcessInfo) => {
+        if (event.button !== 2) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        openProcessContextMenu(process, event.clientX, event.clientY);
+    };
+
+    const handleProcessRowContextMenu = (event: MouseEvent<HTMLTableRowElement>, process: ProcessInfo) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openProcessContextMenu(process, event.clientX, event.clientY);
     };
 
     useEffect(() => {
@@ -326,6 +341,7 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                             onClick={() => openProcessDetail(process)}
                                             onContextMenu={(event) => handleProcessRowContextMenu(event, process)}
                                             onKeyDown={(event) => handleProcessRowKeyDown(event, process)}
+                                            onMouseDown={(event) => handleProcessRowMouseDown(event, process)}
                                             tabIndex={0}
                                         >
                                             <td data-testid="process-name">
@@ -365,7 +381,16 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                         role="complementary"
                     >
                         <div className="detail-drawer-header">
-                            <div>
+                            <button
+                                aria-label={t('common.close')}
+                                className="detail-close-button"
+                                type="button"
+                                onClick={closeProcessDetail}
+                                disabled={isKilling}
+                            >
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                            <div className="detail-drawer-title">
                                 <p className="detail-drawer-kicker">{t('detail.process.aria')}</p>
                                 <h2>{processDetail?.processName ? `${processDetail.processName} PID ${processDetail.pid}` : t('detail.process.aria')}</h2>
                             </div>
@@ -382,15 +407,6 @@ function ProcessesPage({page, t}: ProcessesPageProps) {
                                         }}
                                     >
                                         {t('terminate.process')}
-                                    </button>
-                                    <button
-                                        aria-label={t('common.close')}
-                                        className="dialog-close-button"
-                                        type="button"
-                                        onClick={closeProcessDetail}
-                                        disabled={isKilling}
-                                    >
-                                        {t('common.close')}
                                     </button>
                                 </div>
                             )}

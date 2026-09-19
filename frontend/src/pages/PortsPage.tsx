@@ -151,14 +151,29 @@ function PortsPage({page, t}: PortsPageProps) {
         openPortDetail(port);
     };
 
-    const handlePortRowContextMenu = (event: MouseEvent<HTMLTableRowElement>, port: PortInfo) => {
-        event.preventDefault();
+    const openPortContextMenu = (port: PortInfo, x: number, y: number) => {
         setOperationMessage('');
         setContextMenu({
             port,
-            x: event.clientX,
-            y: event.clientY,
+            x,
+            y,
         });
+    };
+
+    const handlePortRowMouseDown = (event: MouseEvent<HTMLTableRowElement>, port: PortInfo) => {
+        if (event.button !== 2) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        openPortContextMenu(port, event.clientX, event.clientY);
+    };
+
+    const handlePortRowContextMenu = (event: MouseEvent<HTMLTableRowElement>, port: PortInfo) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openPortContextMenu(port, event.clientX, event.clientY);
     };
 
     useEffect(() => {
@@ -320,6 +335,7 @@ function PortsPage({page, t}: PortsPageProps) {
                                             onClick={() => openPortDetail(port)}
                                             onContextMenu={(event) => handlePortRowContextMenu(event, port)}
                                             onKeyDown={(event) => handlePortRowKeyDown(event, port)}
+                                            onMouseDown={(event) => handlePortRowMouseDown(event, port)}
                                             tabIndex={0}
                                         >
                                             <td>
@@ -363,7 +379,16 @@ function PortsPage({page, t}: PortsPageProps) {
                         role="complementary"
                     >
                         <div className="detail-drawer-header">
-                            <div>
+                            <button
+                                aria-label={t('common.close')}
+                                className="detail-close-button"
+                                type="button"
+                                onClick={closePortDetail}
+                                disabled={isKilling}
+                            >
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                            <div className="detail-drawer-title">
                                 <p className="detail-drawer-kicker">{t('detail.port.aria')}</p>
                                 <h2>{selectedPort.processName || t('common.unknown')} :{selectedPort.port}</h2>
                             </div>
@@ -375,15 +400,6 @@ function PortsPage({page, t}: PortsPageProps) {
                                     onClick={() => openKillConfirmation(selectedPort)}
                                 >
                                     {t('terminate.occupancy')}
-                                </button>
-                                <button
-                                    aria-label={t('common.close')}
-                                    className="dialog-close-button"
-                                    type="button"
-                                    onClick={closePortDetail}
-                                    disabled={isKilling}
-                                >
-                                    {t('common.close')}
                                 </button>
                             </div>
                         </div>
@@ -454,6 +470,7 @@ function PortsPage({page, t}: PortsPageProps) {
                     role="menu"
                     style={{left: contextMenu.x, top: contextMenu.y}}
                     aria-label={t('table.portList')}
+                    onClick={(event) => event.stopPropagation()}
                     onContextMenu={(event) => event.preventDefault()}
                 >
                     <button
