@@ -23,12 +23,16 @@ function App() {
     const pages = useMemo(() => getPages(t), [t]);
 
     useEffect(() => {
-        AppName()
+        Promise.resolve().then(() => AppName())
             .then(() => {
                 setBridgeStatus('connected');
             })
             .catch(() => setBridgeStatus('unavailable'));
     }, []);
+
+    useEffect(() => {
+        document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en';
+    }, [language]);
 
     const activePage = getPageById(activePageId, pages);
     const bridgeStatusLabel = bridgeStatus === 'connected'
@@ -47,17 +51,24 @@ function App() {
             <Sidebar
                 activePageId={activePageId}
                 bridgeStatus={bridgeStatusLabel}
+                isConnected={bridgeStatus === 'connected'}
                 pages={pages}
                 t={t}
                 onSelectPage={setActivePageId}
             />
             <main className="main-content">
-                <PagePanel
-                    language={language}
-                    page={activePage}
-                    t={t}
-                    onLanguageChange={handleLanguageChange}
-                />
+                <header className="workspace-header">
+                    <h1>{activePage.label}</h1>
+                    <span className="workspace-context">{t('app.localComputer')}</span>
+                </header>
+                <div className="workspace-body" key={activePageId}>
+                    <PagePanel
+                        language={language}
+                        page={activePage}
+                        t={t}
+                        onLanguageChange={handleLanguageChange}
+                    />
+                </div>
             </main>
         </div>
     );

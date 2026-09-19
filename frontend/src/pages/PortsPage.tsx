@@ -164,6 +164,7 @@ function PortsPage({page, t}: PortsPageProps) {
         || statusFilter !== 'all';
     const emptyMessage = isFiltered ? t('ports.emptyFiltered') : t('ports.empty');
     const processesByPID = useMemo(() => groupProcessesByPID(processes), [processes]);
+    const selectedOwner = selectedPort ? processesByPID.get(selectedPort.pid) : undefined;
     const relatedLogs = useMemo(() => {
         if (!selectedPort) {
             return [];
@@ -219,6 +220,9 @@ function PortsPage({page, t}: PortsPageProps) {
                         ))}
                     </select>
                 </label>
+                <span className="resource-list-count">
+                    {visiblePorts.length}{isFiltered && ` / ${ports.length}`} {t('common.items')}
+                </span>
             </div>
 
             {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}
@@ -240,16 +244,16 @@ function PortsPage({page, t}: PortsPageProps) {
                         <table className="process-table port-table compact-data-table" aria-label={t('table.portList')}>
                             <thead>
                                 <tr>
-                                    <th>{t('field.pid')}</th>
-                                    <th>{t('field.processName')}</th>
-                                    <th>{t('field.path')}</th>
-                                    <th>{t('field.command')}</th>
-                                    <th>{t('field.cpu')}</th>
-                                    <th>{t('field.memory')}</th>
                                     <th>{t('field.port')}</th>
+                                    <th>{t('field.processName')}</th>
+                                    <th>{t('field.pid')}</th>
                                     <th>{t('field.protocol')}</th>
                                     <th>{t('field.status')}</th>
+                                    <th className="metric-heading">{t('field.cpu')}</th>
+                                    <th className="metric-heading">{t('field.memory')}</th>
                                     <th>{t('field.protected')}</th>
+                                    <th>{t('field.path')}</th>
+                                    <th>{t('field.command')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -271,7 +275,10 @@ function PortsPage({page, t}: PortsPageProps) {
                                             onKeyDown={(event) => handlePortRowKeyDown(event, port)}
                                             tabIndex={0}
                                         >
-                                            <td className="mono">{port.pid}</td>
+                                            <td>
+                                                <span className="mono">{port.port}</span>
+                                                {isDevPort && <span className="dev-port-badge">{t('badge.devPort')}</span>}
+                                            </td>
                                             <td data-testid="port-process-name">
                                                 <ProcessNameCell
                                                     iconDataURL={owner?.iconDataURL ?? ''}
@@ -279,24 +286,21 @@ function PortsPage({page, t}: PortsPageProps) {
                                                     fallbackName={t('common.unknown')}
                                                 />
                                             </td>
+                                            <td className="mono">{port.pid}</td>
+                                            <td><span className="protocol-badge">{port.protocol || t('common.unknown')}</span></td>
+                                            <td className="mono">{port.status || t('common.unknown')}</td>
+                                            <td className="mono metric-cell">{owner ? formatPercent(owner.cpuPercent) : t('common.unavailable')}</td>
+                                            <td className="mono metric-cell">{owner ? formatMemorySize(owner.memoryBytes) : t('common.unavailable')}</td>
+                                            <td>
+                                                <span className={isProtected ? 'protected-badge' : 'standard-badge'}>
+                                                    {isProtected ? t('badge.protected') : t('badge.standard')}
+                                                </span>
+                                            </td>
                                             <td className="muted-cell compact-path-cell" title={processPath}>
                                                 {processPath}
                                             </td>
                                             <td className="muted-cell" title={commandLine}>
                                                 <span className="command-cell" title={commandLine}>{commandLine}</span>
-                                            </td>
-                                            <td className="mono metric-cell">{owner ? formatPercent(owner.cpuPercent) : t('common.unavailable')}</td>
-                                            <td className="mono metric-cell">{owner ? formatMemorySize(owner.memoryBytes) : t('common.unavailable')}</td>
-                                            <td>
-                                                <span className="mono">{port.port}</span>
-                                                {isDevPort && <span className="dev-port-badge">{t('badge.devPort')}</span>}
-                                            </td>
-                                            <td><span className="protocol-badge">{port.protocol || t('common.unknown')}</span></td>
-                                            <td className="mono">{port.status || t('common.unknown')}</td>
-                                            <td>
-                                                <span className={isProtected ? 'protected-badge' : 'standard-badge'}>
-                                                    {isProtected ? t('badge.protected') : t('badge.standard')}
-                                                </span>
                                             </td>
                                         </tr>
                                     );
@@ -313,7 +317,7 @@ function PortsPage({page, t}: PortsPageProps) {
                     >
                         <div className="detail-drawer-header">
                             <div>
-                                <p className="detail-drawer-kicker">{t('field.port')} {selectedPort.port}</p>
+                                <p className="detail-drawer-kicker">{t('detail.port.aria')}</p>
                                 <h2>{selectedPort.processName || t('common.unknown')} :{selectedPort.port}</h2>
                             </div>
                             <button
@@ -359,8 +363,20 @@ function PortsPage({page, t}: PortsPageProps) {
                                     <dd>{selectedPort.processName || t('common.unknown')}</dd>
                                 </div>
                                 <div>
+                                    <dt>{t('field.cpu')}</dt>
+                                    <dd className="mono">{selectedOwner ? formatPercent(selectedOwner.cpuPercent) : t('common.unavailable')}</dd>
+                                </div>
+                                <div>
+                                    <dt>{t('field.memory')}</dt>
+                                    <dd className="mono">{selectedOwner ? formatMemorySize(selectedOwner.memoryBytes) : t('common.unavailable')}</dd>
+                                </div>
+                                <div>
                                     <dt>{t('field.processPath')}</dt>
-                                    <dd>{selectedPort.processPath || t('common.unavailable')}</dd>
+                                    <dd>{selectedOwner?.path || selectedPort.processPath || t('common.unavailable')}</dd>
+                                </div>
+                                <div>
+                                    <dt>{t('field.command')}</dt>
+                                    <dd>{selectedOwner?.commandLine || t('common.unavailable')}</dd>
                                 </div>
                             </dl>
 

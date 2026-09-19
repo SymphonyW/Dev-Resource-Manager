@@ -341,19 +341,19 @@ describe('App layout navigation', () => {
         getRecentOperationLogsForResourceMock.mockResolvedValue(operationLogs);
     });
 
-    it('renders all primary navigation pages and highlights Dashboard by default', async () => {
+    it('renders all primary navigation pages and highlights Performance by default', async () => {
         render(<App/>);
 
         expect(screen.queryByText('Desktop')).not.toBeInTheDocument();
         expect(screen.queryByText('Dev Resource Manager')).not.toBeInTheDocument();
-        expect(screen.getByRole('button', {name: 'Dashboard'})).toHaveAttribute('aria-current', 'page');
+        expect(screen.getByRole('button', {name: 'Performance'})).toHaveAttribute('aria-current', 'page');
         expect(screen.getByRole('button', {name: 'Processes'})).toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'Ports'})).toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'Cleanup'})).toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'Logs'})).toBeInTheDocument();
         expect(screen.getByRole('button', {name: 'Settings'})).toBeInTheDocument();
         expect(await screen.findByLabelText('CPU usage chart')).toBeInTheDocument();
-        expect(screen.queryByRole('heading', {name: 'Dashboard'})).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Performance'})).toBeInTheDocument();
         expect(screen.queryByText('System overview')).not.toBeInTheDocument();
     });
 
@@ -364,27 +364,27 @@ describe('App layout navigation', () => {
 
         expect(screen.getByRole('button', {name: 'Ports'})).toHaveAttribute('aria-current', 'page');
         expect(await screen.findByText('node.exe')).toBeInTheDocument();
-        expect(screen.queryByRole('heading', {name: 'Ports'})).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Ports'})).toBeInTheDocument();
         expect(screen.queryByText('Review local TCP and UDP ports and the owning process.')).not.toBeInTheDocument();
     });
 
-    it('does not render page title and description headers above app workspaces', async () => {
+    it('shows one compact page title without redundant descriptions', async () => {
         render(<App/>);
 
         expect(await screen.findByLabelText('CPU usage chart')).toBeInTheDocument();
         expect(screen.queryByText('System overview')).not.toBeInTheDocument();
-        expect(screen.queryByRole('heading', {name: 'Dashboard'})).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Performance'})).toBeInTheDocument();
         expect(screen.queryByText('Monitor CPU, memory, GPU, VRAM, processes, and occupied ports in real time.')).not.toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
         expect(await screen.findByText('node.exe')).toBeInTheDocument();
         expect(screen.queryByText('Process monitor')).not.toBeInTheDocument();
-        expect(screen.queryByRole('heading', {name: 'Processes'})).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Processes'})).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', {name: 'Settings'}));
         expect(await screen.findByText('redis-server.exe')).toBeInTheDocument();
         expect(screen.queryByText('Protection settings')).not.toBeInTheDocument();
-        expect(screen.queryByRole('heading', {name: 'Settings'})).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Settings'})).toBeInTheDocument();
     });
 
     it('loads Dashboard resource metrics and refreshes them automatically', async () => {
@@ -420,13 +420,13 @@ describe('App layout navigation', () => {
         await act(async () => {});
 
         expect(screen.getAllByText('42.5%').length).toBeGreaterThan(0);
-        expect(screen.getByText('9.5 GB / 16.0 GB')).toBeInTheDocument();
+        expect(screen.getByRole('button', {name: 'Memory'})).toHaveTextContent('59.4%');
         expect(screen.queryByText('Total Memory')).not.toBeInTheDocument();
         expect(screen.queryByText('Used Memory')).not.toBeInTheDocument();
         expect(screen.queryByText('Free Memory')).not.toBeInTheDocument();
         expect(screen.getByText('GPU')).toBeInTheDocument();
         expect(screen.getByText('VRAM')).toBeInTheDocument();
-        expect(screen.getByText('3.0 GB / 8.0 GB')).toBeInTheDocument();
+        expect(screen.getByRole('button', {name: 'VRAM'})).toHaveTextContent('37.5%');
         expect(screen.getByText('184')).toBeInTheDocument();
         expect(screen.getByText('37')).toBeInTheDocument();
         expect(screen.getAllByText('Updates every 3 seconds').length).toBeGreaterThan(0);
@@ -446,8 +446,8 @@ describe('App layout navigation', () => {
 
         expect(getSystemResourceInfoMock).toHaveBeenCalledTimes(2);
         expect(screen.getAllByText('25.0%').length).toBeGreaterThan(0);
-        expect(screen.getByText('8.0 GB / 16.0 GB')).toBeInTheDocument();
-        expect(screen.getByText('4.0 GB / 8.0 GB')).toBeInTheDocument();
+        expect(screen.getByRole('button', {name: 'Memory'})).toHaveTextContent('50.0%');
+        expect(screen.getByRole('button', {name: 'VRAM'})).toHaveTextContent('50.0%');
         expect(screen.getByText('190')).toBeInTheDocument();
         expect(screen.getByText('42')).toBeInTheDocument();
     });
@@ -486,9 +486,8 @@ describe('App layout navigation', () => {
 
         expect(screen.getAllByText('42.5%').length).toBeGreaterThan(0);
         expect(screen.getByLabelText('CPU usage chart')).toBeInTheDocument();
-        expect(screen.getByLabelText('Memory usage chart')).toBeInTheDocument();
-        expect(screen.getByLabelText('GPU usage chart')).toBeInTheDocument();
-        expect(screen.getByLabelText('VRAM usage chart')).toBeInTheDocument();
+        expect(screen.queryByLabelText('Memory usage chart')).not.toBeInTheDocument();
+        expect(screen.getByLabelText('CPU usage chart').querySelector('polyline')?.getAttribute('points')?.split(' ')).toHaveLength(1);
 
         await act(async () => {
             vi.advanceTimersByTime(3000);
@@ -499,6 +498,20 @@ describe('App layout navigation', () => {
         expect(screen.getAllByText('25.0%').length).toBeGreaterThan(0);
         expect(screen.getAllByText('50.0%').length).toBeGreaterThanOrEqual(2);
         expect(screen.getByText('28.4%')).toBeInTheDocument();
+        expect(screen.getByLabelText('CPU usage chart').querySelector('polyline')?.getAttribute('points')?.split(' ')).toHaveLength(2);
+        fireEvent.focus(screen.getByLabelText('CPU usage chart'));
+        fireEvent.keyDown(screen.getByLabelText('CPU usage chart'), {key: 'ArrowLeft'});
+        expect(screen.getByText('CPU 42.5%')).toBeInTheDocument();
+        fireEvent.keyDown(screen.getByLabelText('CPU usage chart'), {key: 'ArrowRight'});
+        expect(screen.getByText('CPU 25.0%')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', {name: 'Memory'}));
+        expect(screen.getByLabelText('Memory usage chart')).toBeInTheDocument();
+        expect(screen.getByText('Total Memory')).toBeInTheDocument();
+        expect(screen.getByRole('button', {name: 'Memory'})).toHaveAttribute('aria-pressed', 'true');
+        fireEvent.click(screen.getByRole('button', {name: 'GPU'}));
+        expect(screen.getByLabelText('GPU usage chart')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', {name: 'VRAM'}));
+        expect(screen.getByLabelText('VRAM usage chart')).toBeInTheDocument();
     });
 
     it('shows interactive Dashboard chart values when hovering a chart', async () => {
@@ -521,7 +534,7 @@ describe('App layout navigation', () => {
         });
 
         expect(screen.getByRole('button', {name: '进程'})).toBeInTheDocument();
-        expect(screen.queryByRole('heading', {name: '设置'})).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: '设置'})).toBeInTheDocument();
         expect(screen.getByLabelText('语言')).toHaveValue('zh');
     });
 
@@ -866,7 +879,7 @@ describe('App layout navigation', () => {
         fireEvent.click(screen.getByRole('button', {name: 'Cleanup'}));
 
         expect(await screen.findByText('node.exe')).toBeInTheDocument();
-        expect(screen.queryByRole('heading', {name: 'Cleanup'})).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Cleanup'})).toBeInTheDocument();
         expect(screen.getByRole('toolbar', {name: 'Cleanup actions'})).toHaveClass('cleanup-toolbar');
         expect(screen.getByText('Candidates')).toBeInTheDocument();
         expect(screen.getByText('Selected')).toBeInTheDocument();
@@ -904,35 +917,35 @@ describe('App layout navigation', () => {
         expect(within(detailPanel).getByRole('button', {name: 'End Process'})).not.toBeDisabled();
     });
 
-    it('keeps resource tables on the same process-first column model', async () => {
+    it('prioritizes the resource identity and usage before long diagnostic fields', async () => {
         render(<App/>);
 
         fireEvent.click(screen.getByRole('button', {name: 'Processes'}));
         expect(await screen.findByText('node.exe')).toBeInTheDocument();
         expect(getColumnHeaders('Process list')).toEqual([
-            'PID',
             'Process Name',
-            'Path',
-            'Command',
+            'PID',
             'CPU',
             'Memory',
             'Ports',
             'Protected',
+            'Path',
+            'Command',
         ]);
 
         fireEvent.click(screen.getByRole('button', {name: 'Ports'}));
         expect(await screen.findByText('3000')).toBeInTheDocument();
         expect(getColumnHeaders('Port list')).toEqual([
-            'PID',
-            'Process Name',
-            'Path',
-            'Command',
-            'CPU',
-            'Memory',
             'Port',
+            'Process Name',
+            'PID',
             'Protocol',
             'Status',
+            'CPU',
+            'Memory',
             'Protected',
+            'Path',
+            'Command',
         ]);
 
         fireEvent.click(screen.getByRole('button', {name: 'Cleanup'}));
@@ -975,7 +988,7 @@ describe('App layout navigation', () => {
         expect(appStyles).toMatch(/\.process-table td\s*\{[^}]*height: var\(--resource-table-row-height\);/s);
         expect(appStyles).toMatch(/\.command-cell\s*\{[^}]*white-space: nowrap;/s);
         expect(appStyles).toMatch(/\.process-name-cell\s*\{[^}]*display: flex;/s);
-        expect(appStyles).toMatch(/\.process-table-shell\s*\{[^}]*max-height: calc\(100vh - 154px\);/s);
+        expect(appStyles).toMatch(/\.process-table-shell\s*\{[^}]*min-height: 0;/s);
         expect(appStyles).toMatch(/\.process-table-wrap\s*\{[^}]*overflow-x: hidden;/s);
         expect(appStyles).toMatch(/\.process-table-wrap\s*\{[^}]*overflow-y: auto;/s);
         expect(appStyles).toMatch(/\.process-table-scrollbar\s*\{[^}]*position: relative;/s);
@@ -1101,7 +1114,7 @@ describe('App layout navigation', () => {
         fireEvent.change(screen.getByLabelText('Cleanup rule name'), {target: {value: 'Worker'}});
         fireEvent.change(screen.getByLabelText('Process names'), {target: {value: 'worker.exe'}});
         fireEvent.change(screen.getByLabelText('Command keywords'), {target: {value: 'queue'}});
-        fireEvent.change(screen.getByLabelText('Ports'), {target: {value: '7001'}});
+        fireEvent.change(screen.getByRole('textbox', {name: 'Ports'}), {target: {value: '7001'}});
         fireEvent.change(screen.getByLabelText('Port ranges'), {target: {value: '7100-7102'}});
         fireEvent.click(screen.getByRole('button', {name: 'Add cleanup rule'}));
 
@@ -1130,7 +1143,7 @@ describe('App layout navigation', () => {
         fireEvent.click(screen.getByRole('button', {name: 'Logs'}));
 
         await act(async () => {});
-        expect(screen.queryByRole('heading', {name: 'Logs'})).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', {name: 'Logs'})).toBeInTheDocument();
         expect(screen.getByText('No operation logs found.')).toBeInTheDocument();
         expect(screen.queryByRole('button', {name: 'Refresh Logs'})).not.toBeInTheDocument();
 

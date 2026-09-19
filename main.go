@@ -17,15 +17,15 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:     "dev-resource-manager",
+		Title:     "Dev Resource Manager",
 		Width:     1400,
 		Height:    900,
-		MinWidth:  1180,
-		MinHeight: 720,
+		MinWidth:  960,
+		MinHeight: 640,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 244, G: 248, B: 255, A: 1},
+		BackgroundColour: &options.RGBA{R: 255, G: 255, B: 255, A: 1},
 		OnStartup:        app.startup,
 		Bind: []interface{}{
 			app,

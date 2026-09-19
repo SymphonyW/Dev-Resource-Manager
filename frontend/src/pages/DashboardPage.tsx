@@ -6,284 +6,163 @@ import {formatMemorySize, formatPercent, loadSystemResourceInfo} from '../servic
 import type {Translator} from '../services/i18n';
 import type {PageDefinition} from '../types/navigation';
 import type {SystemResourceInfo} from '../types/systemResources';
+import './DashboardPage.css';
 
-const resourceRefreshIntervalMs = 3000;
-const maxHistoryPoints = 30;
+const refreshInterval = 3000;
+const historyWindow = 60_000;
+type ResourceKey = 'cpu' | 'memory' | 'gpu' | 'vram';
+interface Sample { time: number; cpu: number; memory: number; gpu: number; vram: number; }
+interface Props { page: PageDefinition; t: Translator; }
 
-interface DashboardPageProps {
-    page: PageDefinition;
-    t: Translator;
+const percent = (value: number) => Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
+const ratio = (used: number, total: number) => total > 0 ? percent(used / total * 100) : 0;
+
+function graphPoints(history: Sample[], key: ResourceKey) {
+    const end = history[history.length - 1]?.time ?? 0;
+    return history.map(sample => ({
+        x: Math.max(0, 100 - (end - sample.time) / historyWindow * 100),
+        y: 100 - sample[key],
+        value: sample[key],
+    }));
 }
 
-interface ResourceHistoryPoint {
-    cpuPercent: number;
-    memoryPercent: number;
-    gpuPercent: number;
-    vramPercent: number;
-}
+function DashboardPage({page, t}: Props) {
+    const [info, setInfo] = useState<SystemResourceInfo | null>(null);
+    const [history, setHistory] = useState<Sample[]>([]);
+    const [selected, setSelected] = useState<ResourceKey>('cpu');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(true);
 
-function DashboardPage({page, t}: DashboardPageProps) {
-    const [resourceInfo, setResourceInfo] = useState<SystemResourceInfo | null>(null);
-    const [resourceHistory, setResourceHistory] = useState<ResourceHistoryPoint[]>([]);
-    const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const [errorMessage, setErrorMessage] = useState('');
-
-    const loadResources = useCallback(async (showLoading = true) => {
-        if (showLoading) {
-            setIsLoading(true);
-        }
-        setErrorMessage('');
-
+    const load = useCallback(async () => {
         try {
-            const nextResourceInfo = await loadSystemResourceInfo();
-            const nextPoint = {
-                cpuPercent: clampPercent(nextResourceInfo.cpuPercent),
-                memoryPercent: getMemoryUsagePercent(nextResourceInfo),
-                gpuPercent: clampPercent(nextResourceInfo.gpuPercent),
-                vramPercent: getVRAMUsagePercent(nextResourceInfo),
+            const next = await loadSystemResourceInfo();
+            const sample: Sample = {
+                time: Date.now(),
+                cpu: percent(next.cpuPercent),
+                memory: ratio(next.usedMemoryBytes, next.totalMemoryBytes),
+                gpu: percent(next.gpuPercent),
+                vram: ratio(next.usedVRAMBytes, next.totalVRAMBytes),
             };
-
-            setResourceInfo(nextResourceInfo);
-            setLastUpdatedAt(new Date());
-            setResourceHistory((currentHistory) => {
-                const seededHistory = currentHistory.length === 0
-                    ? Array.from({length: maxHistoryPoints - 1}, () => nextPoint)
-                    : currentHistory;
-
-                return [...seededHistory, nextPoint].slice(-maxHistoryPoints);
-            });
+            setInfo(next);
+            setHistory(current => [...current.filter(item => item.time >= sample.time - historyWindow), sample].slice(-21));
+            setError('');
         } catch {
-            setErrorMessage(t('dashboard.error'));
+            setError(t('dashboard.error'));
         } finally {
-            if (showLoading) {
-                setIsLoading(false);
-            }
+            setLoading(false);
         }
     }, [t]);
+    useSequentialAutoRefresh(load, refreshInterval);
 
-    useSequentialAutoRefresh(loadResources, resourceRefreshIntervalMs);
-
-    const memoryPercent = resourceInfo ? getMemoryUsagePercent(resourceInfo) : 0;
-    const vramPercent = resourceInfo ? getVRAMUsagePercent(resourceInfo) : 0;
-    const metrics = resourceInfo
-        ? [
-            {label: t('dashboard.metric.processes'), value: resourceInfo.processCount.toString()},
-            {label: t('dashboard.metric.occupiedPorts'), value: resourceInfo.portCount.toString()},
-        ]
-        : [];
+    const resources = [
+        {key: 'cpu' as const, title: t('dashboard.chart.cpu'), aria: t('dashboard.chart.cpuAria')},
+        {key: 'memory' as const, title: t('dashboard.chart.memory'), aria: t('dashboard.chart.memoryAria')},
+        {key: 'gpu' as const, title: t('dashboard.chart.gpu'), aria: t('dashboard.chart.gpuAria')},
+        {key: 'vram' as const, title: t('dashboard.chart.vram'), aria: t('dashboard.chart.vramAria')},
+    ];
+    const active = resources.find(resource => resource.key === selected)!;
+    const latest = history[history.length - 1];
+    const memorySelected = selected === 'memory';
+    const capacitySelected = memorySelected || selected === 'vram';
+    const subtitle = info && capacitySelected
+        ? formatMemorySize(memorySelected ? info.totalMemoryBytes : info.totalVRAMBytes)
+        : t('dashboard.autoRefresh');
+    const metrics = info ? [
+        {label: t('dashboard.metric.usage'), value: formatPercent(latest?.[selected] ?? 0)},
+        ...(capacitySelected ? [
+            {label: t(memorySelected ? 'dashboard.metric.usedMemory' : 'dashboard.metric.usedVRAM'), value: formatMemorySize(memorySelected ? info.usedMemoryBytes : info.usedVRAMBytes)},
+            {label: t(memorySelected ? 'dashboard.metric.freeMemory' : 'dashboard.metric.freeVRAM'), value: formatMemorySize(memorySelected ? info.freeMemoryBytes : info.freeVRAMBytes)},
+            {label: t(memorySelected ? 'dashboard.metric.totalMemory' : 'dashboard.metric.totalVRAM'), value: subtitle},
+        ] : []),
+        {label: t('dashboard.metric.processes'), value: String(info.processCount)},
+        {label: t('dashboard.metric.occupiedPorts'), value: String(info.portCount)},
+    ] : [];
 
     return (
         <section className="page-panel dashboard-page" aria-label={page.title}>
-            {errorMessage && <StatusMessage variant="error">{errorMessage}</StatusMessage>}
-            {isLoading && !resourceInfo && (
-                <StatusMessage variant="loading">{t('dashboard.loading')}</StatusMessage>
-            )}
-
-            {resourceInfo && (
-                <>
-                    <div className="resource-chart-grid task-manager-grid">
-                        <ResourceGraph
-                            ariaLabel={t('dashboard.chart.cpuAria')}
-                            title={t('dashboard.chart.cpu')}
-                            subtitle={t('dashboard.autoRefresh')}
-                            value={formatPercent(resourceInfo.cpuPercent)}
-                            history={resourceHistory}
-                            historyKey="cpuPercent"
-                            t={t}
-                        />
-
-                        <ResourceGraph
-                            ariaLabel={t('dashboard.chart.memoryAria')}
-                            title={t('dashboard.chart.memory')}
-                            subtitle={`${formatMemorySize(resourceInfo.usedMemoryBytes)} / ${formatMemorySize(resourceInfo.totalMemoryBytes)}`}
-                            value={formatPercent(memoryPercent)}
-                            history={resourceHistory}
-                            historyKey="memoryPercent"
-                            t={t}
-                        />
-
-                        <ResourceGraph
-                            ariaLabel={t('dashboard.chart.gpuAria')}
-                            title={t('dashboard.chart.gpu')}
-                            subtitle={t('dashboard.autoRefresh')}
-                            value={formatPercent(resourceInfo.gpuPercent)}
-                            history={resourceHistory}
-                            historyKey="gpuPercent"
-                            t={t}
-                        />
-
-                        <ResourceGraph
-                            ariaLabel={t('dashboard.chart.vramAria')}
-                            title={t('dashboard.chart.vram')}
-                            subtitle={`${formatMemorySize(resourceInfo.usedVRAMBytes)} / ${formatMemorySize(resourceInfo.totalVRAMBytes)}`}
-                            value={formatPercent(vramPercent)}
-                            history={resourceHistory}
-                            historyKey="vramPercent"
-                            t={t}
-                        />
+            {error && <StatusMessage variant="error">{error}</StatusMessage>}
+            {loading && !info && <StatusMessage variant="loading">{t('dashboard.loading')}</StatusMessage>}
+            {info && <div className="performance-workspace">
+                <div className="resource-selector" role="group" aria-label={t('dashboard.resources')}>
+                    {resources.map(resource => {
+                        const points = graphPoints(history, resource.key);
+                        return (
+                            <button type="button" className="resource-select" key={resource.key}
+                                aria-label={resource.title} aria-pressed={selected === resource.key}
+                                onClick={() => setSelected(resource.key)}>
+                                <svg className="resource-mini-chart" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                                    <polyline points={points.map(point => point.x + ',' + point.y).join(' ')}/>
+                                </svg>
+                                <span className="resource-select-text">
+                                    <span className="resource-select-title">{resource.title}</span>
+                                    <span className="resource-select-value">{formatPercent(latest?.[resource.key] ?? 0)}</span>
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+                <div className="performance-main">
+                    <div className="performance-heading">
+                        <h2>{active.title}</h2>
+                        <span>{subtitle}</span>
                     </div>
-
-                    <dl className="resource-grid" aria-label="System resource metrics">
-                        {metrics.map((metric) => (
-                            <div className="resource-metric" key={metric.label}>
-                                <dt>{metric.label}</dt>
-                                <dd>{metric.value}</dd>
-                            </div>
-                        ))}
+                    <ResourceGraph key={selected} history={history} resourceKey={selected} title={active.title} ariaLabel={active.aria} t={t}/>
+                    <dl className="performance-metrics">
+                        {metrics.map(metric => <div key={metric.label}><dt>{metric.label}</dt><dd>{metric.value}</dd></div>)}
                     </dl>
-
-                    {lastUpdatedAt && (
-                        <p className="resource-updated-at">
-                            {t('dashboard.lastUpdated')}: {lastUpdatedAt.toLocaleTimeString()}
-                        </p>
-                    )}
-                </>
-            )}
+                    {latest && <p className="resource-updated-at">{t('dashboard.lastUpdated')}: {new Date(latest.time).toLocaleTimeString()}</p>}
+                </div>
+            </div>}
         </section>
     );
 }
 
-interface ResourceGraphProps {
-    ariaLabel: string;
-    history: ResourceHistoryPoint[];
-    historyKey: keyof ResourceHistoryPoint;
-    subtitle: string;
-    title: string;
-    value: string;
-    t: Translator;
-}
+function ResourceGraph({history, resourceKey, title, ariaLabel, t}: {
+    history: Sample[]; resourceKey: ResourceKey; title: string; ariaLabel: string; t: Translator;
+}) {
+    const [activeIndex, setActiveIndex] = useState<number | null>(null);
+    const points = graphPoints(history, resourceKey);
+    const active = activeIndex === null ? null : points[Math.min(activeIndex, points.length - 1)];
+    const pointsString = points.map(point => point.x + ',' + point.y).join(' ');
+    const area = points.length > 1
+        ? 'M' + points[0].x + ',100 L' + pointsString.replaceAll(' ', ' L') + ' L100,100 Z'
+        : '';
 
-function ResourceGraph({ariaLabel, history, historyKey, subtitle, title, value, t}: ResourceGraphProps) {
-    const [activePointIndex, setActivePointIndex] = useState<number | null>(null);
-    const graphPoints = getGraphPoints(history, historyKey);
-    const points = buildSparklinePoints(history, historyKey);
-    const areaPath = buildAreaPath(history, historyKey);
-    const activeGraphPoint = activePointIndex === null ? null : graphPoints[activePointIndex] ?? null;
-    const activeHistoryPoint = activePointIndex === null
-        ? null
-        : history[Math.min(activePointIndex, Math.max(history.length - 1, 0))] ?? null;
-    const activeValue = activeHistoryPoint ? formatPercent(clampPercent(activeHistoryPoint[historyKey])) : '';
-
-    const handleChartMouseMove = (event: MouseEvent<SVGSVGElement>) => {
-        if (graphPoints.length === 0) {
-            return;
-        }
-
+    const handleMove = (event: MouseEvent<SVGSVGElement>) => {
         const bounds = event.currentTarget.getBoundingClientRect();
-        const chartWidth = bounds.width || 100;
-        const relativeX = Math.min(chartWidth, Math.max(0, event.clientX - bounds.left));
-        const nextPointIndex = Math.round((relativeX / chartWidth) * (graphPoints.length - 1));
-        setActivePointIndex(nextPointIndex);
+        const x = (event.clientX - bounds.left) / (bounds.width || 100) * 100;
+        const nearest = points.reduce((best, point, index) => Math.abs(point.x - x) < Math.abs(points[best].x - x) ? index : best, 0);
+        setActiveIndex(nearest);
     };
 
     return (
-        <section className="resource-chart-panel task-manager-chart">
-            <div className="resource-chart-heading">
-                <div>
-                    <h2>{title}</h2>
-                    <p>{subtitle}</p>
-                </div>
-                <strong>{value}</strong>
-            </div>
-            <div className="task-chart-frame">
-                <span className="chart-axis-label chart-axis-top">100%</span>
-                <span className="chart-axis-label chart-axis-bottom">0</span>
-                <svg
-                    aria-label={ariaLabel}
-                    className="cpu-sparkline"
-                    onBlur={() => setActivePointIndex(null)}
-                    onFocus={() => setActivePointIndex(graphPoints.length > 0 ? graphPoints.length - 1 : null)}
-                    onMouseLeave={() => setActivePointIndex(null)}
-                    onMouseMove={handleChartMouseMove}
-                    role="img"
-                    tabIndex={0}
-                    viewBox="0 0 100 64"
-                    preserveAspectRatio="none"
-                >
-                    <path d={areaPath}/>
-                    <polyline points={points}/>
-                    {activeGraphPoint && (
-                        <g className="chart-active-marker">
-                            <line x1={activeGraphPoint.x} y1="4" x2={activeGraphPoint.x} y2="62"/>
-                            <circle cx={activeGraphPoint.x} cy={activeGraphPoint.y} r="2.2"/>
-                        </g>
-                    )}
+        <div className="performance-chart">
+            <div className="performance-chart-label"><span>{t('dashboard.metric.usage')}</span><span>100%</span></div>
+            <div className="performance-chart-frame">
+                <svg className="performance-graph" viewBox="0 0 100 100" preserveAspectRatio="none"
+                    aria-label={ariaLabel} aria-describedby="chart-keyboard-hint" role="img" tabIndex={0}
+                    onMouseMove={handleMove} onMouseLeave={() => setActiveIndex(null)}
+                    onFocus={() => setActiveIndex(points.length - 1)} onBlur={() => setActiveIndex(null)}
+                    onKeyDown={event => {
+                        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+                        event.preventDefault();
+                        setActiveIndex(current => Math.max(0, Math.min(points.length - 1, (current ?? points.length - 1) + (event.key === 'ArrowLeft' ? -1 : 1))));
+                    }}>
+                    <g className="performance-grid">
+                        {[20, 40, 60, 80].map(value => <line key={'h' + value} x1="0" x2="100" y1={value} y2={value}/>)}
+                        {[10, 20, 30, 40, 50, 60, 70, 80, 90].map(value => <line key={'v' + value} y1="0" y2="100" x1={value} x2={value}/>)}
+                    </g>
+                    {area && <path className="performance-area" d={area}/>}
+                    <polyline className="performance-line" points={pointsString}/>
+                    {points.length === 1 && <line className="performance-line" x1="99.6" x2="100" y1={points[0].y} y2={points[0].y}/>}
+                    {active && <line className="performance-crosshair" x1={active.x} x2={active.x} y1="0" y2="100"/>}
                 </svg>
-                {activeGraphPoint && activeValue && (
-                    <output
-                        className="chart-hover-tooltip"
-                        style={{
-                            left: `${activeGraphPoint.x}%`,
-                            top: `${(activeGraphPoint.y / 64) * 100}%`,
-                        }}
-                    >
-                        {title} {activeValue}
-                    </output>
-                )}
-                <span className="chart-time-label">{t('dashboard.chart.sixtySeconds')}</span>
+                {active && <output className="chart-hover-tooltip">{title} {formatPercent(active.value)}</output>}
             </div>
-        </section>
+            <div className="performance-chart-label"><span>{t('dashboard.chart.sixtySeconds')}</span><span>{t('dashboard.chart.now')}</span></div>
+            <span className="visually-hidden" id="chart-keyboard-hint">{t('dashboard.chart.keyboardHint')}</span>
+        </div>
     );
-}
-
-function getMemoryUsagePercent(resourceInfo: SystemResourceInfo): number {
-    if (resourceInfo.totalMemoryBytes <= 0) {
-        return 0;
-    }
-
-    return clampPercent((resourceInfo.usedMemoryBytes / resourceInfo.totalMemoryBytes) * 100);
-}
-
-function getVRAMUsagePercent(resourceInfo: SystemResourceInfo): number {
-    if (resourceInfo.totalVRAMBytes <= 0) {
-        return 0;
-    }
-
-    return clampPercent((resourceInfo.usedVRAMBytes / resourceInfo.totalVRAMBytes) * 100);
-}
-
-function clampPercent(value: number): number {
-    if (!Number.isFinite(value)) {
-        return 0;
-    }
-
-    return Math.min(100, Math.max(0, value));
-}
-
-function getGraphPoints(history: ResourceHistoryPoint[], key: keyof ResourceHistoryPoint): Array<{x: number; y: number}> {
-    if (history.length === 0) {
-        return [];
-    }
-
-    const points = history.length === 1 ? [history[0], history[0]] : history;
-    const xStep = points.length > 1 ? 100 / (points.length - 1) : 100;
-
-    return points.map((point, index) => {
-        const x = index * xStep;
-        const y = 62 - (clampPercent(point[key]) / 100) * 58;
-
-        return {x, y};
-    });
-}
-
-function buildSparklinePoints(history: ResourceHistoryPoint[], key: keyof ResourceHistoryPoint): string {
-    return getGraphPoints(history, key)
-        .map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`)
-        .join(' ');
-}
-
-function buildAreaPath(history: ResourceHistoryPoint[], key: keyof ResourceHistoryPoint): string {
-    const points = getGraphPoints(history, key);
-    if (points.length === 0) {
-        return '';
-    }
-
-    const line = points
-        .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
-        .join(' ');
-
-    return `${line} L 100 64 L 0 64 Z`;
 }
 
 export default DashboardPage;
