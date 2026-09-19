@@ -525,7 +525,10 @@ describe('App layout navigation', () => {
         expect(screen.getAllByText('25.0%').length).toBeGreaterThan(0);
         expect(screen.getAllByText('50.0%').length).toBeGreaterThanOrEqual(2);
         expect(screen.getByText('28.4%')).toBeInTheDocument();
-        expect(screen.getByLabelText('CPU usage chart').querySelector('polyline')?.getAttribute('points')?.split(' ')).toHaveLength(2);
+        const cpuPoints = screen.getByLabelText('CPU usage chart').querySelector('polyline')?.getAttribute('points')?.split(' ') ?? [];
+        expect(cpuPoints).toHaveLength(2);
+        expect(cpuPoints[0]).toMatch(/^0,/);
+        expect(cpuPoints[1]).toMatch(/^100,/);
         fireEvent.focus(screen.getByLabelText('CPU usage chart'));
         fireEvent.keyDown(screen.getByLabelText('CPU usage chart'), {key: 'ArrowLeft'});
         expect(screen.getByText('CPU 42.5%')).toBeInTheDocument();
