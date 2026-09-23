@@ -8,8 +8,10 @@ import (
 )
 
 const (
-	dynamicResourceRefreshInterval = 5 * time.Second
-	staticResourceRefreshInterval  = time.Minute
+	gpuResourceRefreshInterval    = 5 * time.Second
+	threadResourceRefreshInterval = 5 * time.Second
+	portResourceRefreshInterval   = 10 * time.Second
+	staticResourceRefreshInterval = time.Minute
 )
 
 type asyncSystemResourceCollectors struct {
@@ -23,9 +25,9 @@ var defaultAsyncSystemResourceCollectors = newAsyncSystemResourceCollectors()
 
 func newAsyncSystemResourceCollectors() asyncSystemResourceCollectors {
 	cpuInfo := newAsyncCachedCollector(collectCPUResourceInfo, staticResourceRefreshInterval)
-	gpu := newAsyncCachedCollector(resource.GetGPUInfo, dynamicResourceRefreshInterval)
-	threadCount := newAsyncCachedCollector(collectThreadCount, dynamicResourceRefreshInterval)
-	portCount := newAsyncCachedCollector(collectPortCount, dynamicResourceRefreshInterval)
+	gpu := newAsyncCachedCollector(resource.GetGPUInfo, gpuResourceRefreshInterval)
+	threadCount := newAsyncCachedCollector(collectThreadCount, threadResourceRefreshInterval)
+	portCount := newAsyncCachedCollector(collectPortCount, portResourceRefreshInterval)
 
 	return asyncSystemResourceCollectors{
 		CPUInfo:     cpuInfo.Get,

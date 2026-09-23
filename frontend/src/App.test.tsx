@@ -473,7 +473,7 @@ describe('App layout navigation', () => {
         expect(screen.queryByRole('button', {name: 'Refresh'})).not.toBeInTheDocument();
 
         await act(async () => {
-            vi.advanceTimersByTime(2999);
+            vi.advanceTimersByTime(999);
         });
         await act(async () => {});
         expect(getSystemResourceInfoMock).toHaveBeenCalledTimes(1);
@@ -526,7 +526,7 @@ describe('App layout navigation', () => {
         expect(screen.getByLabelText('CPU usage chart').querySelector('polyline')?.getAttribute('points')?.split(' ')).toHaveLength(1);
 
         await act(async () => {
-            vi.advanceTimersByTime(3000);
+            vi.advanceTimersByTime(1000);
         });
         await act(async () => {});
 
