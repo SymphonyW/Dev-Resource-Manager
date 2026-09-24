@@ -9,6 +9,7 @@ import (
 )
 
 func TestGetSystemResourceInfoReturnsResourceSnapshot(t *testing.T) {
+	useLightweightAsyncSystemResourceCollectors(t)
 	app := newTestApp(t)
 
 	info := app.GetSystemResourceInfo()
@@ -24,6 +25,14 @@ func TestGetSystemResourceInfoReturnsResourceSnapshot(t *testing.T) {
 	}
 	if info.PortCount < 0 {
 		t.Fatalf("PortCount should not be negative: %d", info.PortCount)
+	}
+}
+
+func TestCollectSystemResourceInfoReturnsNonNilGPUNames(t *testing.T) {
+	info := collectSystemResourceInfo(systemResourceCollectors{})
+
+	if info.GPUNames == nil {
+		t.Fatalf("expected GPU names to serialize as an empty array, got nil")
 	}
 }
 
@@ -317,6 +326,29 @@ func listenOnLocalTCPPortForAppTest(t *testing.T) (net.Listener, int) {
 	}
 
 	return listener, addr.Port
+}
+
+func useLightweightAsyncSystemResourceCollectors(t *testing.T) {
+	t.Helper()
+
+	original := defaultAsyncSystemResourceCollectors
+	defaultAsyncSystemResourceCollectors = asyncSystemResourceCollectors{
+		CPUInfo: func() cpuResourceInfo {
+			return cpuResourceInfo{}
+		},
+		GPU: func() resource.GPUInfo {
+			return resource.GPUInfo{Names: []string{}}
+		},
+		ThreadCount: func() int {
+			return 0
+		},
+		PortCount: func() int {
+			return 0
+		},
+	}
+	t.Cleanup(func() {
+		defaultAsyncSystemResourceCollectors = original
+	})
 }
 
 func waitForAppTestCondition(t *testing.T, condition func() bool, message string) {

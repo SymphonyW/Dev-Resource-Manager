@@ -189,7 +189,7 @@ func collectSystemResourceInfo(collectors systemResourceCollectors) SystemResour
 		UsedMemoryBytes:      memoryInfo.UsedBytes,
 		FreeMemoryBytes:      memoryInfo.FreeBytes,
 		GPUPercent:           gpuInfo.GPUPercent,
-		GPUNames:             gpuInfo.Names,
+		GPUNames:             nonNilStrings(gpuInfo.Names),
 		TotalVRAMBytes:       gpuInfo.TotalVRAMBytes,
 		UsedVRAMBytes:        gpuInfo.UsedVRAMBytes,
 		FreeVRAMBytes:        gpuInfo.FreeVRAMBytes,
@@ -208,6 +208,14 @@ func collectCPUPercent() float64 {
 	}
 
 	return roundOneDecimal(percentages[0])
+}
+
+func nonNilStrings(values []string) []string {
+	if values == nil {
+		return []string{}
+	}
+
+	return values
 }
 
 func collectCPUResourceInfo() cpuResourceInfo {

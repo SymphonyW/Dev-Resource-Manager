@@ -189,8 +189,8 @@ function buildMetrics(info: SystemResourceInfo, key: ResourceKey, usage: number,
     ];
 }
 
-function formatList(values: string[], t: Translator): string {
-    const normalized = values.map(value => value.trim()).filter(Boolean);
+function formatList(values: string[] | null | undefined, t: Translator): string {
+    const normalized = (values ?? []).map(value => value.trim()).filter(Boolean);
     return normalized.length > 0 ? normalized.join(', ') : t('common.unavailable');
 }
 
