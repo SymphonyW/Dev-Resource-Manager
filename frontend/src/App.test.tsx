@@ -380,6 +380,23 @@ describe('App layout navigation', () => {
         expect(screen.queryByText('System overview')).not.toBeInTheDocument();
     });
 
+    it('renders Dashboard while async GPU details are still pending', async () => {
+        getSystemResourceInfoMock.mockResolvedValueOnce({
+            ...makeSystemResourceInfo(),
+            gpuNames: null,
+            gpuPercent: 0,
+            totalVRAMBytes: 0,
+            usedVRAMBytes: 0,
+            freeVRAMBytes: 0,
+        });
+
+        render(<App/>);
+
+        expect(await screen.findByLabelText('CPU usage chart')).toBeInTheDocument();
+        expect(screen.getByRole('button', {name: 'GPU'})).toHaveTextContent('Unavailable');
+        expect(screen.getByRole('button', {name: 'VRAM'})).toHaveTextContent('Unavailable');
+    });
+
     it('switches the main content when a navigation item is selected', async () => {
         render(<App/>);
 
@@ -473,7 +490,7 @@ describe('App layout navigation', () => {
         expect(screen.queryByRole('button', {name: 'Refresh'})).not.toBeInTheDocument();
 
         await act(async () => {
-            vi.advanceTimersByTime(2999);
+            vi.advanceTimersByTime(999);
         });
         await act(async () => {});
         expect(getSystemResourceInfoMock).toHaveBeenCalledTimes(1);
@@ -526,7 +543,7 @@ describe('App layout navigation', () => {
         expect(screen.getByLabelText('CPU usage chart').querySelector('polyline')?.getAttribute('points')?.split(' ')).toHaveLength(1);
 
         await act(async () => {
-            vi.advanceTimersByTime(3000);
+            vi.advanceTimersByTime(1000);
         });
         await act(async () => {});
 

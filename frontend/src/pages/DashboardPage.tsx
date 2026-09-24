@@ -8,8 +8,9 @@ import type {PageDefinition} from '../types/navigation';
 import type {SystemResourceInfo} from '../types/systemResources';
 import './DashboardPage.css';
 
-const refreshInterval = 3000;
+const refreshInterval = 1000;
 const historyWindow = 60_000;
+const maxHistorySamples = 61;
 type ResourceKey = 'cpu' | 'memory' | 'gpu' | 'vram';
 interface Sample { time: number; cpu: number; memory: number; gpu: number; vram: number; }
 interface Props { page: PageDefinition; t: Translator; }
@@ -63,7 +64,7 @@ function DashboardPage({page, t}: Props) {
                 vram: ratio(next.usedVRAMBytes, next.totalVRAMBytes),
             };
             setInfo(next);
-            setHistory(current => [...current.filter(item => item.time >= sample.time - historyWindow), sample].slice(-21));
+            setHistory(current => [...current.filter(item => item.time >= sample.time - historyWindow), sample].slice(-maxHistorySamples));
             setError('');
         } catch {
             setError(t('dashboard.error'));
@@ -188,8 +189,8 @@ function buildMetrics(info: SystemResourceInfo, key: ResourceKey, usage: number,
     ];
 }
 
-function formatList(values: string[], t: Translator): string {
-    const normalized = values.map(value => value.trim()).filter(Boolean);
+function formatList(values: string[] | null | undefined, t: Translator): string {
+    const normalized = (values ?? []).map(value => value.trim()).filter(Boolean);
     return normalized.length > 0 ? normalized.join(', ') : t('common.unavailable');
 }
 

@@ -8,7 +8,7 @@ export interface SystemResourceInfo {
     usedMemoryBytes: number;
     freeMemoryBytes: number;
     gpuPercent: number;
-    gpuNames: string[];
+    gpuNames: string[] | null;
     totalVRAMBytes: number;
     usedVRAMBytes: number;
     freeVRAMBytes: number;

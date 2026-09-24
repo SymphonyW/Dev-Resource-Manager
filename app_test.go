@@ -9,6 +9,7 @@ import (
 )
 
 func TestGetSystemResourceInfoReturnsResourceSnapshot(t *testing.T) {
+	useLightweightAsyncSystemResourceCollectors(t)
 	app := newTestApp(t)
 
 	info := app.GetSystemResourceInfo()
@@ -24,6 +25,14 @@ func TestGetSystemResourceInfoReturnsResourceSnapshot(t *testing.T) {
 	}
 	if info.PortCount < 0 {
 		t.Fatalf("PortCount should not be negative: %d", info.PortCount)
+	}
+}
+
+func TestCollectSystemResourceInfoReturnsNonNilGPUNames(t *testing.T) {
+	info := collectSystemResourceInfo(systemResourceCollectors{})
+
+	if info.GPUNames == nil {
+		t.Fatalf("expected GPU names to serialize as an empty array, got nil")
 	}
 }
 
@@ -114,6 +123,39 @@ func TestCollectSystemResourceInfoRunsCollectorsConcurrently(t *testing.T) {
 		}
 	case <-time.After(150 * time.Millisecond):
 		t.Fatalf("expected resource info after releasing collectors")
+	}
+}
+
+func TestAsyncCachedCollectorReturnsImmediatelyAndLimitsInFlightWork(t *testing.T) {
+	var calls atomic.Int32
+	release := make(chan struct{})
+	collector := newAsyncCachedCollector(func() int {
+		calls.Add(1)
+		<-release
+		return 42
+	}, time.Hour)
+
+	if value := collector.Get(); value != 0 {
+		t.Fatalf("expected zero value before first async refresh completes, got %d", value)
+	}
+
+	waitForAppTestCondition(t, func() bool {
+		return calls.Load() == 1
+	}, "expected first async refresh to start")
+
+	if value := collector.Get(); value != 0 {
+		t.Fatalf("expected zero value while refresh is still running, got %d", value)
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("expected one in-flight refresh, got %d", got)
+	}
+
+	close(release)
+	waitForAppTestCondition(t, func() bool {
+		return collector.Get() == 42
+	}, "expected cached value after async refresh completes")
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("expected cached read not to refresh inside interval, got %d calls", got)
 	}
 }
 
@@ -284,4 +326,41 @@ func listenOnLocalTCPPortForAppTest(t *testing.T) (net.Listener, int) {
 	}
 
 	return listener, addr.Port
+}
+
+func useLightweightAsyncSystemResourceCollectors(t *testing.T) {
+	t.Helper()
+
+	original := defaultAsyncSystemResourceCollectors
+	defaultAsyncSystemResourceCollectors = asyncSystemResourceCollectors{
+		CPUInfo: func() cpuResourceInfo {
+			return cpuResourceInfo{}
+		},
+		GPU: func() resource.GPUInfo {
+			return resource.GPUInfo{Names: []string{}}
+		},
+		ThreadCount: func() int {
+			return 0
+		},
+		PortCount: func() int {
+			return 0
+		},
+	}
+	t.Cleanup(func() {
+		defaultAsyncSystemResourceCollectors = original
+	})
+}
+
+func waitForAppTestCondition(t *testing.T, condition func() bool, message string) {
+	t.Helper()
+
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	t.Fatal(message)
 }
