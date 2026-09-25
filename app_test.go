@@ -126,6 +126,44 @@ func TestCollectSystemResourceInfoRunsCollectorsConcurrently(t *testing.T) {
 	}
 }
 
+func TestCachedResourceCollectorCollectsOnceSynchronously(t *testing.T) {
+	var calls atomic.Int32
+	collector := newCachedResourceCollector(func() int {
+		calls.Add(1)
+		return 42
+	})
+
+	if value := collector.Get(); value != 42 {
+		t.Fatalf("expected first read to return collected value, got %d", value)
+	}
+	if value := collector.Get(); value != 42 {
+		t.Fatalf("expected cached read to return collected value, got %d", value)
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("expected collector to run once, got %d calls", got)
+	}
+}
+
+func TestCachedResourceCollectorRetriesAfterPanic(t *testing.T) {
+	var calls atomic.Int32
+	collector := newCachedResourceCollector(func() int {
+		if calls.Add(1) == 1 {
+			panic("first collection failed")
+		}
+		return 42
+	})
+
+	if value := collector.Get(); value != 0 {
+		t.Fatalf("expected zero value after failed collection, got %d", value)
+	}
+	if value := collector.Get(); value != 42 {
+		t.Fatalf("expected retry to return collected value, got %d", value)
+	}
+	if got := calls.Load(); got != 2 {
+		t.Fatalf("expected retry after panic, got %d calls", got)
+	}
+}
+
 func TestAsyncCachedCollectorReturnsImmediatelyAndLimitsInFlightWork(t *testing.T) {
 	var calls atomic.Int32
 	release := make(chan struct{})

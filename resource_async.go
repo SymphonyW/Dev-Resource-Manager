@@ -11,7 +11,6 @@ const (
 	gpuResourceRefreshInterval    = 5 * time.Second
 	threadResourceRefreshInterval = 5 * time.Second
 	portResourceRefreshInterval   = 10 * time.Second
-	staticResourceRefreshInterval = time.Minute
 )
 
 type asyncSystemResourceCollectors struct {
@@ -24,7 +23,7 @@ type asyncSystemResourceCollectors struct {
 var defaultAsyncSystemResourceCollectors = newAsyncSystemResourceCollectors()
 
 func newAsyncSystemResourceCollectors() asyncSystemResourceCollectors {
-	cpuInfo := newAsyncCachedCollector(collectCPUResourceInfo, staticResourceRefreshInterval)
+	cpuInfo := newCachedResourceCollector(collectCPUResourceInfo)
 	gpu := newAsyncCachedCollector(resource.GetGPUInfo, gpuResourceRefreshInterval)
 	threadCount := newAsyncCachedCollector(collectThreadCount, threadResourceRefreshInterval)
 	portCount := newAsyncCachedCollector(collectPortCount, portResourceRefreshInterval)
@@ -35,6 +34,42 @@ func newAsyncSystemResourceCollectors() asyncSystemResourceCollectors {
 		ThreadCount: threadCount.Get,
 		PortCount:   portCount.Get,
 	}
+}
+
+type cachedResourceCollector[T any] struct {
+	mu       sync.Mutex
+	collect  func() T
+	value    T
+	hasValue bool
+}
+
+func newCachedResourceCollector[T any](collect func() T) *cachedResourceCollector[T] {
+	return &cachedResourceCollector[T]{
+		collect: collect,
+	}
+}
+
+func (collector *cachedResourceCollector[T]) Get() T {
+	var zero T
+	if collector == nil || collector.collect == nil {
+		return zero
+	}
+
+	collector.mu.Lock()
+	defer collector.mu.Unlock()
+
+	if collector.hasValue {
+		return collector.value
+	}
+
+	next, didCollect := runResourceCollector(collector.collect)
+	if !didCollect {
+		return zero
+	}
+
+	collector.value = next
+	collector.hasValue = true
+	return next
 }
 
 type asyncCachedCollector[T any] struct {
@@ -81,23 +116,24 @@ func (collector *asyncCachedCollector[T]) Get() T {
 }
 
 func (collector *asyncCachedCollector[T]) refresh(collect func() T) {
-	var next T
-	didCollect := false
+	next, didCollect := runResourceCollector(collect)
+	collector.mu.Lock()
+	defer collector.mu.Unlock()
+
+	if didCollect {
+		collector.value = next
+		collector.hasValue = true
+	}
+	collector.inFlight = false
+}
+
+func runResourceCollector[T any](collect func() T) (value T, didCollect bool) {
 	defer func() {
 		if recover() != nil {
 			didCollect = false
 		}
-
-		collector.mu.Lock()
-		defer collector.mu.Unlock()
-
-		if didCollect {
-			collector.value = next
-			collector.hasValue = true
-		}
-		collector.inFlight = false
 	}()
 
-	next = collect()
-	didCollect = true
+	value = collect()
+	return value, true
 }
