@@ -235,6 +235,9 @@ func collectCPUResourceInfo() cpuResourceInfo {
 			}
 		}
 	}
+	if info.Name == "" {
+		info.Name = collectCPUModelNameFallback()
+	}
 
 	if physicalCores, err := cpu.Counts(false); err == nil && physicalCores > 0 {
 		info.PhysicalCores = physicalCores
